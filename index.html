@@ -11,6 +11,11 @@
   header { background:linear-gradient(135deg,#eaf6f3,#faf7f2); padding:22px 18px 18px; border-bottom:1px solid var(--line); }
   header .eyebrow { font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent); margin:0 0 4px; font-weight:700; }
   header h1 { margin:0; font-size:22px; color:var(--ink); }
+  .modo-card { display:flex; align-items:center; gap:14px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:20px 16px; margin-bottom:12px; cursor:pointer; }
+  .modo-card:active { opacity:0.7; }
+  .modo-emoji { font-size:30px; }
+  .modo-nombre { font-size:17px; font-weight:700; }
+  .modo-desc { font-size:12px; color:var(--ink-soft); margin-top:2px; }
   .area-card { display:flex; align-items:center; gap:14px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:18px 16px; margin-bottom:12px; cursor:pointer; }
   .area-card:active { opacity:0.7; }
   .area-emoji { font-size:28px; }
@@ -38,9 +43,6 @@
   .back { color:var(--accent); font-size:14px; background:none; border:none; padding:0; margin-bottom:14px; display:flex; align-items:center; gap:6px; }
   .section-title { font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); margin:20px 0 8px; }
   .msg { font-size:13px; text-align:center; margin-top:8px; }
-  .top-tabs { display:flex; gap:8px; margin-bottom:16px; }
-  .top-tab { flex:1; text-align:center; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--paper); color:var(--ink-soft); font-size:13px; font-weight:600; }
-  .top-tab.activo { background:var(--accent); color:#0c1a17; border-color:var(--accent); }
   .prod-item { font-size:12.5px; color:var(--ink-soft); padding:8px 0; border-bottom:1px solid var(--line); }
   .prod-item:last-child { border-bottom:none; }
 </style>
@@ -49,40 +51,86 @@
 
 <header>
   <p class="eyebrow" id="headerEyebrow">Casa Turquesa · Cocina</p>
-  <h1 id="headerTitle">👨‍🍳 Recetario</h1>
+  <h1 id="headerTitle">👨‍🍳 Cocina</h1>
 </header>
 
 <main>
-  <div id="vistaAreas">
+  <!-- HOME: elegir modo -->
+  <div id="vistaHome">
+    <div class="modo-card" data-modo="calculadora">
+      <div class="modo-emoji">🧮</div>
+      <div><div class="modo-nombre">Calculadora</div><div class="modo-desc">Elige un producto y cuánto quieres hacer</div></div>
+    </div>
+    <div class="modo-card" data-modo="recetario">
+      <div class="modo-emoji">📖</div>
+      <div><div class="modo-nombre">Recetario</div><div class="modo-desc">Ver ingredientes y paso a paso por área</div></div>
+    </div>
+    <div class="modo-card" data-modo="produccion">
+      <div class="modo-emoji">📋</div>
+      <div><div class="modo-nombre">Producción</div><div class="modo-desc">Registrar lo que hiciste y ver el historial</div></div>
+    </div>
+  </div>
+
+  <!-- RECETARIO: areas -->
+  <div id="vistaAreas" class="hidden">
+    <button class="back" id="btnVolverHomeDesdeAreas">← Inicio</button>
     <div id="listaAreas"><p class="rinde">Cargando...</p></div>
   </div>
 
+  <!-- Lista de recetas (usada por Recetario dentro de un área, y por Calculadora/Producción con todas) -->
   <div id="vistaLista" class="hidden">
-    <button class="back" id="btnVolverAreas">← Todas las áreas</button>
+    <button class="back" id="btnVolverLista">← Volver</button>
     <input type="text" id="buscar" placeholder="🔍 Buscar receta...">
     <div id="listaRecetas"><p class="rinde">Cargando...</p></div>
   </div>
 
+  <!-- Detalle solo lectura (Recetario) -->
   <div id="vistaDetalle" class="hidden">
-    <button class="back" id="btnVolver">← Volver</button>
+    <button class="back" id="btnVolverDetalle">← Volver</button>
     <div class="cat" id="detCategoria"></div>
     <h2 id="detNombre" style="margin:2px 0 4px;"></h2>
     <div class="rinde" id="detRinde"></div>
 
-    <div style="display:flex;align-items:center;gap:10px;margin:16px 0;">
-      <span style="font-size:13px;color:var(--ink-soft);">Escalar receta ×</span>
-      <input type="number" id="multiplicador" value="1" min="0.1" step="any" style="width:90px;margin:0;">
-    </div>
-
-    <div class="section-title">Ingredientes</div>
+    <div class="section-title">Ingredientes (receta base)</div>
     <div class="card" id="listaIngredientes"></div>
 
     <div class="section-title">Preparación</div>
     <div class="card" id="listaPasos"></div>
+  </div>
+
+  <!-- Calculadora -->
+  <div id="vistaCalculadora" class="hidden">
+    <button class="back" id="btnVolverCalc">← Volver</button>
+    <div class="cat" id="calcCategoria"></div>
+    <h2 id="calcNombre" style="margin:2px 0 4px;"></h2>
+    <div class="rinde" id="calcRinde"></div>
+
+    <div class="card" style="margin:16px 0;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;">¿Cuánto quieres hacer?</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input type="number" id="cantidadDeseada" min="0.1" step="any" style="margin:0;flex:1;">
+        <span id="unidadDeseada" style="font-size:13px;color:var(--ink-soft);white-space:nowrap;"></span>
+      </div>
+      <div id="multiplicadorInfo" style="font-size:11.5px;color:var(--ink-soft);margin-top:6px;"></div>
+    </div>
+
+    <div class="section-title">Ingredientes necesarios</div>
+    <div class="card" id="calcIngredientes"></div>
+
+    <button class="btn-primary" id="btnIrAProduccionDesdeCalc" style="margin-top:16px;">📋 Registrar esta producción</button>
+  </div>
+
+  <!-- Producción -->
+  <div id="vistaProduccion" class="hidden">
+    <button class="back" id="btnVolverProd">← Volver</button>
+    <div class="cat" id="prodCategoria"></div>
+    <h2 id="prodNombre" style="margin:2px 0 4px;"></h2>
+    <div class="rinde" id="prodRinde"></div>
 
     <div class="section-title">📋 Registrar producción</div>
     <div class="card">
       <select id="prodCocinero"><option value="">-- ¿Quién la hizo? --</option></select>
+      <input type="number" id="prodMultiplicador" min="0.1" step="any" placeholder="Veces la receta base (ej. 1, 2, 0.5)" value="1">
       <input type="date" id="prodFecha">
       <textarea id="prodNotas" placeholder="Notas (opcional)"></textarea>
       <button class="btn-primary" id="btnRegistrarProduccion">Registrar producción</button>
@@ -104,6 +152,7 @@ let RECETAS = [];
 let COCINEROS = [];
 let RECETA_ACTIVA = null;
 let AREA_ACTIVA = null;
+let MODO = null; // 'calculadora' | 'recetario' | 'produccion'
 
 const AREAS = [
   { nombre: "Pastelería", emoji: "🧁" },
@@ -113,13 +162,39 @@ const AREAS = [
   { nombre: "Ensaladas", emoji: "🥗" },
 ];
 
+function fmtCantidad(n) { return Number(n.toFixed(2)).toString(); }
+function ocultarTodo() {
+  ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion"].forEach(id => document.getElementById(id).classList.add("hidden"));
+}
+function irAHome() {
+  ocultarTodo();
+  document.getElementById("vistaHome").classList.remove("hidden");
+  document.getElementById("headerEyebrow").textContent = "Casa Turquesa · Cocina";
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll(".modo-card").forEach(el => {
+  el.addEventListener("click", () => {
+    MODO = el.dataset.modo;
+    if (MODO === "recetario") { ocultarTodo(); document.getElementById("vistaAreas").classList.remove("hidden"); renderAreas(); }
+    else { AREA_ACTIVA = null; ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); document.getElementById("buscar").value = ""; renderLista(); }
+    window.scrollTo({ top: 0 });
+  });
+});
+document.getElementById("btnVolverHomeDesdeAreas").addEventListener("click", irAHome);
+document.getElementById("btnVolverLista").addEventListener("click", () => {
+  if (MODO === "recetario" && AREA_ACTIVA) { ocultarTodo(); document.getElementById("vistaAreas").classList.remove("hidden"); renderAreas(); }
+  else irAHome();
+});
+document.getElementById("btnVolverDetalle").addEventListener("click", () => { ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); });
+document.getElementById("btnVolverCalc").addEventListener("click", () => { ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); });
+document.getElementById("btnVolverProd").addEventListener("click", () => { ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); });
+
 async function cargarRecetas() {
   const [recetas, ingredientes] = await Promise.all([
     fetch(`${SUPABASE_URL}/rest/v1/recetas?negocio=eq.turquesa&activo=eq.true&select=id,nombre,area,categoria,rendimiento_cantidad,rendimiento_unidad,pasos,notas&order=area,categoria,nombre`, { headers: H }).then(r => r.json()),
     fetch(`${SUPABASE_URL}/rest/v1/receta_ingredientes?select=receta_id,producto_nombre,cantidad,unidad,orden&order=orden`, { headers: H }).then(r => r.json())
   ]);
   RECETAS = recetas.map(r => ({ ...r, ingredientes: ingredientes.filter(i => i.receta_id === r.id) }));
-  renderAreas();
 }
 
 function renderAreas() {
@@ -131,25 +206,15 @@ function renderAreas() {
       <div><div class="area-nombre">${a.nombre}</div><div class="area-count">${n} receta${n === 1 ? "" : "s"}</div></div>
     </div>`;
   }).join("");
-  wrap.querySelectorAll(".area-card").forEach(el => el.addEventListener("click", () => abrirArea(el.dataset.area)));
+  wrap.querySelectorAll(".area-card").forEach(el => el.addEventListener("click", () => {
+    AREA_ACTIVA = el.dataset.area;
+    ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden");
+    document.getElementById("buscar").value = "";
+    document.getElementById("headerEyebrow").textContent = "Casa Turquesa · " + AREA_ACTIVA;
+    renderLista();
+    window.scrollTo({ top: 0 });
+  }));
 }
-
-function abrirArea(area) {
-  AREA_ACTIVA = area;
-  document.getElementById("vistaAreas").classList.add("hidden");
-  document.getElementById("vistaLista").classList.remove("hidden");
-  document.getElementById("buscar").value = "";
-  document.getElementById("headerEyebrow").textContent = "Casa Turquesa · " + area;
-  renderLista();
-  window.scrollTo({ top: 0 });
-}
-document.getElementById("btnVolverAreas").addEventListener("click", () => {
-  document.getElementById("vistaLista").classList.add("hidden");
-  document.getElementById("vistaAreas").classList.remove("hidden");
-  document.getElementById("headerEyebrow").textContent = "Casa Turquesa · Cocina";
-  renderAreas();
-  window.scrollTo({ top: 0 });
-});
 
 async function cargarCocineros() {
   try {
@@ -163,62 +228,91 @@ async function cargarCocineros() {
 function renderLista() {
   const q = (document.getElementById("buscar").value || "").trim().toLowerCase();
   const wrap = document.getElementById("listaRecetas");
-  const filtradas = RECETAS.filter(r => r.area === AREA_ACTIVA && (!q || r.nombre.toLowerCase().includes(q) || (r.categoria||"").toLowerCase().includes(q)));
-  if (!filtradas.length) { wrap.innerHTML = '<p class="rinde">Aún no hay recetas cargadas en esta área.</p>'; return; }
-  const porCategoria = {};
-  filtradas.forEach(r => { (porCategoria[r.categoria || "Otras"] ||= []).push(r); });
-  wrap.innerHTML = Object.entries(porCategoria).map(([cat, items]) => `
-    <div class="section-title">${cat}</div>
+  const base = MODO === "recetario" ? RECETAS.filter(r => r.area === AREA_ACTIVA) : RECETAS;
+  const filtradas = base.filter(r => !q || r.nombre.toLowerCase().includes(q) || (r.categoria||"").toLowerCase().includes(q) || (r.area||"").toLowerCase().includes(q));
+  if (!filtradas.length) { wrap.innerHTML = '<p class="rinde">Sin recetas.</p>'; return; }
+  const agruparPor = MODO === "recetario" ? (r => r.categoria || "Otras") : (r => r.area + (r.categoria ? " · " + r.categoria : ""));
+  const grupos = {};
+  filtradas.forEach(r => { (grupos[agruparPor(r)] ||= []).push(r); });
+  wrap.innerHTML = Object.entries(grupos).map(([g, items]) => `
+    <div class="section-title">${g}</div>
     ${items.map(r => `
       <div class="card card-tap" data-id="${r.id}">
         <div class="nombre">${r.nombre}</div>
         <div class="rinde">Rinde ${r.rendimiento_cantidad} ${r.rendimiento_unidad}</div>
       </div>`).join("")}
   `).join("");
-  wrap.querySelectorAll(".card-tap").forEach(el => el.addEventListener("click", () => abrirReceta(el.dataset.id)));
+  wrap.querySelectorAll(".card-tap").forEach(el => el.addEventListener("click", () => elegirReceta(el.dataset.id)));
 }
 document.getElementById("buscar").addEventListener("input", renderLista);
 
-function factorEscala() { return Number(document.getElementById("multiplicador").value) || 1; }
-
-function fmtCantidad(n) {
-  return Number(n.toFixed(2)).toString();
-}
-
-function renderIngredientesYPasos() {
-  const r = RECETA_ACTIVA;
-  const f = factorEscala();
-  document.getElementById("listaIngredientes").innerHTML = r.ingredientes.map(i => `
-    <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${fmtCantidad(Number(i.cantidad) * f)} ${i.unidad}</strong></div>
-  `).join("") || '<p class="rinde">Sin ingredientes cargados.</p>';
-
-  document.getElementById("listaPasos").innerHTML = (r.pasos || []).map((p, i) => `
-    <div class="paso-row"><div class="paso-num">${i+1}</div><div>${p}</div></div>
-  `).join("") + (r.notas ? `<div class="paso-row"><div class="paso-num">⚠️</div><div style="color:var(--ink-soft);">${r.notas}</div></div>` : "");
-}
-document.getElementById("multiplicador").addEventListener("input", renderIngredientesYPasos);
-
-function abrirReceta(id) {
+function elegirReceta(id) {
   RECETA_ACTIVA = RECETAS.find(r => r.id === id);
   if (!RECETA_ACTIVA) return;
-  document.getElementById("vistaLista").classList.add("hidden");
+  ocultarTodo();
+  if (MODO === "recetario") abrirDetalle();
+  else if (MODO === "calculadora") abrirCalculadora();
+  else abrirProduccion();
+  window.scrollTo({ top: 0 });
+}
+
+// ---- RECETARIO (solo lectura) ----
+function abrirDetalle() {
   document.getElementById("vistaDetalle").classList.remove("hidden");
-  document.getElementById("detCategoria").textContent = RECETA_ACTIVA.categoria || "";
+  document.getElementById("detCategoria").textContent = RECETA_ACTIVA.area + (RECETA_ACTIVA.categoria ? " · " + RECETA_ACTIVA.categoria : "");
   document.getElementById("detNombre").textContent = RECETA_ACTIVA.nombre;
   document.getElementById("detRinde").textContent = `Rinde ${RECETA_ACTIVA.rendimiento_cantidad} ${RECETA_ACTIVA.rendimiento_unidad}`;
-  document.getElementById("multiplicador").value = "1";
+  document.getElementById("listaIngredientes").innerHTML = RECETA_ACTIVA.ingredientes.map(i => `
+    <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${i.cantidad} ${i.unidad}</strong></div>
+  `).join("") || '<p class="rinde">Sin ingredientes cargados.</p>';
+  document.getElementById("listaPasos").innerHTML = (RECETA_ACTIVA.pasos || []).map((p, i) => `
+    <div class="paso-row"><div class="paso-num">${i+1}</div><div>${p}</div></div>
+  `).join("") + (RECETA_ACTIVA.notas ? `<div class="paso-row"><div class="paso-num">⚠️</div><div style="color:var(--ink-soft);">${RECETA_ACTIVA.notas}</div></div>` : "");
+}
+
+// ---- CALCULADORA ----
+function factorEscalaCalc() {
+  const deseada = Number(document.getElementById("cantidadDeseada").value) || 0;
+  const base = Number(RECETA_ACTIVA.rendimiento_cantidad) || 1;
+  return deseada > 0 ? deseada / base : 1;
+}
+function renderCalculadora() {
+  const f = factorEscalaCalc();
+  document.getElementById("multiplicadorInfo").textContent =
+    Math.abs(f - 1) < 0.001 ? "Esto es la receta base." : `Esto es ×${fmtCantidad(f)} la receta base.`;
+  document.getElementById("calcIngredientes").innerHTML = RECETA_ACTIVA.ingredientes.map(i => `
+    <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${fmtCantidad(Number(i.cantidad) * f)} ${i.unidad}</strong></div>
+  `).join("") || '<p class="rinde">Sin ingredientes cargados.</p>';
+}
+function abrirCalculadora() {
+  document.getElementById("vistaCalculadora").classList.remove("hidden");
+  document.getElementById("calcCategoria").textContent = RECETA_ACTIVA.area + (RECETA_ACTIVA.categoria ? " · " + RECETA_ACTIVA.categoria : "");
+  document.getElementById("calcNombre").textContent = RECETA_ACTIVA.nombre;
+  document.getElementById("calcRinde").textContent = `Rinde ${RECETA_ACTIVA.rendimiento_cantidad} ${RECETA_ACTIVA.rendimiento_unidad}`;
+  document.getElementById("cantidadDeseada").value = RECETA_ACTIVA.rendimiento_cantidad;
+  document.getElementById("unidadDeseada").textContent = RECETA_ACTIVA.rendimiento_unidad;
+  renderCalculadora();
+}
+document.getElementById("cantidadDeseada").addEventListener("input", renderCalculadora);
+document.getElementById("btnIrAProduccionDesdeCalc").addEventListener("click", () => {
+  const f = factorEscalaCalc();
+  ocultarTodo();
+  abrirProduccion();
+  document.getElementById("prodMultiplicador").value = fmtCantidad(f);
+});
+
+// ---- PRODUCCIÓN ----
+function abrirProduccion() {
+  document.getElementById("vistaProduccion").classList.remove("hidden");
+  document.getElementById("prodCategoria").textContent = RECETA_ACTIVA.area + (RECETA_ACTIVA.categoria ? " · " + RECETA_ACTIVA.categoria : "");
+  document.getElementById("prodNombre").textContent = RECETA_ACTIVA.nombre;
+  document.getElementById("prodRinde").textContent = `Rinde ${RECETA_ACTIVA.rendimiento_cantidad} ${RECETA_ACTIVA.rendimiento_unidad}`;
+  document.getElementById("prodMultiplicador").value = "1";
   document.getElementById("prodFecha").valueAsDate = new Date();
   document.getElementById("prodNotas").value = "";
   document.getElementById("prodMsg").textContent = "";
-  renderIngredientesYPasos();
   cargarHistorial(RECETA_ACTIVA.id);
-  window.scrollTo({ top: 0 });
 }
-document.getElementById("btnVolver").addEventListener("click", () => {
-  document.getElementById("vistaDetalle").classList.add("hidden");
-  document.getElementById("vistaLista").classList.remove("hidden");
-});
-
 document.getElementById("prodCocinero").addEventListener("change", (e) => {
   if (e.target.value === "__otro__") {
     const nombre = prompt("Nombre de quien hizo la producción:");
@@ -240,7 +334,7 @@ async function registrarProduccion() {
   const payload = {
     receta_id: RECETA_ACTIVA.id,
     fecha: document.getElementById("prodFecha").value || new Date().toISOString().slice(0,10),
-    multiplicador: factorEscala(),
+    multiplicador: Number(document.getElementById("prodMultiplicador").value) || 1,
     realizado_por: cocinero,
     notas: document.getElementById("prodNotas").value.trim() || null
   };
