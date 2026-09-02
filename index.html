@@ -11,6 +11,11 @@
   header { background:linear-gradient(135deg,#eaf6f3,#faf7f2); padding:22px 18px 18px; border-bottom:1px solid var(--line); }
   header .eyebrow { font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent); margin:0 0 4px; font-weight:700; }
   header h1 { margin:0; font-size:22px; color:var(--ink); }
+  .area-card { display:flex; align-items:center; gap:14px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:18px 16px; margin-bottom:12px; cursor:pointer; }
+  .area-card:active { opacity:0.7; }
+  .area-emoji { font-size:28px; }
+  .area-nombre { font-size:16px; font-weight:700; }
+  .area-count { font-size:12px; color:var(--ink-soft); margin-top:2px; }
   main { padding:16px; max-width:640px; margin:0 auto; padding-bottom:80px; }
   input, select, textarea, button { font-family:inherit; font-size:15px; }
   input[type=text], input[type=number], input[type=date], select, textarea { width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--paper); color:var(--ink); margin-bottom:10px; }
@@ -43,18 +48,23 @@
 <body>
 
 <header>
-  <p class="eyebrow">Casa Turquesa · Pastelería</p>
-  <h1 id="headerTitle">🧁 Recetario</h1>
+  <p class="eyebrow" id="headerEyebrow">Casa Turquesa · Cocina</p>
+  <h1 id="headerTitle">👨‍🍳 Recetario</h1>
 </header>
 
 <main>
-  <div id="vistaLista">
+  <div id="vistaAreas">
+    <div id="listaAreas"><p class="rinde">Cargando...</p></div>
+  </div>
+
+  <div id="vistaLista" class="hidden">
+    <button class="back" id="btnVolverAreas">← Todas las áreas</button>
     <input type="text" id="buscar" placeholder="🔍 Buscar receta...">
     <div id="listaRecetas"><p class="rinde">Cargando...</p></div>
   </div>
 
   <div id="vistaDetalle" class="hidden">
-    <button class="back" id="btnVolver">← Volver al recetario</button>
+    <button class="back" id="btnVolver">← Volver</button>
     <div class="cat" id="detCategoria"></div>
     <h2 id="detNombre" style="margin:2px 0 4px;"></h2>
     <div class="rinde" id="detRinde"></div>
@@ -93,15 +103,52 @@ const HJ = Object.assign({ "Content-Type": "application/json" }, H);
 let RECETAS = [];
 let COCINEROS = [];
 let RECETA_ACTIVA = null;
+let AREA_ACTIVA = null;
+
+const AREAS = [
+  { nombre: "Pastelería", emoji: "🧁" },
+  { nombre: "Waffles", emoji: "🧇" },
+  { nombre: "Pizza", emoji: "🍕" },
+  { nombre: "Sandwich", emoji: "🥪" },
+];
 
 async function cargarRecetas() {
   const [recetas, ingredientes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/recetas?negocio=eq.turquesa&activo=eq.true&select=id,nombre,categoria,rendimiento_cantidad,rendimiento_unidad,pasos,notas&order=categoria,nombre`, { headers: H }).then(r => r.json()),
+    fetch(`${SUPABASE_URL}/rest/v1/recetas?negocio=eq.turquesa&activo=eq.true&select=id,nombre,area,categoria,rendimiento_cantidad,rendimiento_unidad,pasos,notas&order=area,categoria,nombre`, { headers: H }).then(r => r.json()),
     fetch(`${SUPABASE_URL}/rest/v1/receta_ingredientes?select=receta_id,producto_nombre,cantidad,unidad,orden&order=orden`, { headers: H }).then(r => r.json())
   ]);
   RECETAS = recetas.map(r => ({ ...r, ingredientes: ingredientes.filter(i => i.receta_id === r.id) }));
-  renderLista();
+  renderAreas();
 }
+
+function renderAreas() {
+  const wrap = document.getElementById("listaAreas");
+  wrap.innerHTML = AREAS.map(a => {
+    const n = RECETAS.filter(r => r.area === a.nombre).length;
+    return `<div class="area-card" data-area="${a.nombre}">
+      <div class="area-emoji">${a.emoji}</div>
+      <div><div class="area-nombre">${a.nombre}</div><div class="area-count">${n} receta${n === 1 ? "" : "s"}</div></div>
+    </div>`;
+  }).join("");
+  wrap.querySelectorAll(".area-card").forEach(el => el.addEventListener("click", () => abrirArea(el.dataset.area)));
+}
+
+function abrirArea(area) {
+  AREA_ACTIVA = area;
+  document.getElementById("vistaAreas").classList.add("hidden");
+  document.getElementById("vistaLista").classList.remove("hidden");
+  document.getElementById("buscar").value = "";
+  document.getElementById("headerEyebrow").textContent = "Casa Turquesa · " + area;
+  renderLista();
+  window.scrollTo({ top: 0 });
+}
+document.getElementById("btnVolverAreas").addEventListener("click", () => {
+  document.getElementById("vistaLista").classList.add("hidden");
+  document.getElementById("vistaAreas").classList.remove("hidden");
+  document.getElementById("headerEyebrow").textContent = "Casa Turquesa · Cocina";
+  renderAreas();
+  window.scrollTo({ top: 0 });
+});
 
 async function cargarCocineros() {
   try {
@@ -115,8 +162,8 @@ async function cargarCocineros() {
 function renderLista() {
   const q = (document.getElementById("buscar").value || "").trim().toLowerCase();
   const wrap = document.getElementById("listaRecetas");
-  const filtradas = RECETAS.filter(r => !q || r.nombre.toLowerCase().includes(q) || (r.categoria||"").toLowerCase().includes(q));
-  if (!filtradas.length) { wrap.innerHTML = '<p class="rinde">Sin recetas aún.</p>'; return; }
+  const filtradas = RECETAS.filter(r => r.area === AREA_ACTIVA && (!q || r.nombre.toLowerCase().includes(q) || (r.categoria||"").toLowerCase().includes(q)));
+  if (!filtradas.length) { wrap.innerHTML = '<p class="rinde">Aún no hay recetas cargadas en esta área.</p>'; return; }
   const porCategoria = {};
   filtradas.forEach(r => { (porCategoria[r.categoria || "Otras"] ||= []).push(r); });
   wrap.innerHTML = Object.entries(porCategoria).map(([cat, items]) => `
