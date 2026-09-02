@@ -84,6 +84,8 @@
     <div id="listaRecetas"><p class="rinde">Cargando...</p></div>
   </div>
 
+  <div id="carritoBar" class="hidden" style="position:fixed;left:0;right:0;bottom:0;background:var(--accent);color:#0c1a17;padding:14px 16px;text-align:center;font-weight:700;cursor:pointer;z-index:10;">🧺 Ver lista combinada (<span id="carritoCount">0</span>)</div>
+
   <!-- Detalle solo lectura (Recetario) -->
   <div id="vistaDetalle" class="hidden">
     <button class="back" id="btnVolverDetalle">← Volver</button>
@@ -117,7 +119,23 @@
     <div class="section-title">Ingredientes necesarios</div>
     <div class="card" id="calcIngredientes"></div>
 
-    <button class="btn-primary" id="btnIrAProduccionDesdeCalc" style="margin-top:16px;">📋 Registrar esta producción</button>
+    <button class="btn-secondary" id="btnAgregarCarrito" style="margin-top:16px;">➕ Agregar a la lista combinada</button>
+    <button class="btn-primary" id="btnIrAProduccionDesdeCalc" style="margin-top:10px;">📋 Registrar esta producción</button>
+  </div>
+
+  <!-- Carrito: varias recetas combinadas -->
+  <div id="vistaCarrito" class="hidden">
+    <button class="back" id="btnVolverCarrito">← Volver</button>
+    <h2 style="margin:2px 0 4px;">🧺 Lista combinada</h2>
+    <div class="rinde" style="margin-bottom:14px;">Ingredientes sumados de todas las recetas que agregaste.</div>
+
+    <div class="section-title">Recetas en la lista</div>
+    <div class="card" id="carritoRecetas"></div>
+
+    <div class="section-title">Ingredientes totales</div>
+    <div class="card" id="carritoIngredientes"></div>
+
+    <button class="btn-secondary" id="btnVaciarCarrito" style="margin-top:14px;">Vaciar lista</button>
   </div>
 
   <!-- Producción -->
@@ -153,6 +171,7 @@ let COCINEROS = [];
 let RECETA_ACTIVA = null;
 let AREA_ACTIVA = null;
 let MODO = null; // 'calculadora' | 'recetario' | 'produccion'
+let CARRITO = []; // { recetaId, nombre, area, categoria, cantidadDeseada, rendimiento_cantidad, rendimiento_unidad }
 
 const AREAS = [
   { nombre: "Pastelería", emoji: "🧁" },
@@ -164,12 +183,29 @@ const AREAS = [
 
 function fmtCantidad(n) { return Number(n.toFixed(2)).toString(); }
 function ocultarTodo() {
-  ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion"].forEach(id => document.getElementById(id).classList.add("hidden"));
+  ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito"].forEach(id => document.getElementById(id).classList.add("hidden"));
 }
+function vistaActiva() {
+  return ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito"].find(id => !document.getElementById(id).classList.contains("hidden"));
+}
+function renderCarritoBar() {
+  const bar = document.getElementById("carritoBar");
+  const activa = vistaActiva();
+  const mostrar = MODO === "calculadora" && CARRITO.length > 0 && activa !== "vistaCarrito" && activa !== "vistaProduccion";
+  bar.classList.toggle("hidden", !mostrar);
+  document.getElementById("carritoCount").textContent = CARRITO.length;
+}
+document.getElementById("carritoBar").addEventListener("click", () => {
+  ocultarTodo();
+  document.getElementById("vistaCarrito").classList.remove("hidden");
+  renderCarrito();
+  window.scrollTo({ top: 0 });
+});
 function irAHome() {
   ocultarTodo();
   document.getElementById("vistaHome").classList.remove("hidden");
   document.getElementById("headerEyebrow").textContent = "Casa Turquesa · Cocina";
+  renderCarritoBar();
   window.scrollTo({ top: 0 });
 }
 document.querySelectorAll(".modo-card").forEach(el => {
@@ -177,6 +213,7 @@ document.querySelectorAll(".modo-card").forEach(el => {
     MODO = el.dataset.modo;
     if (MODO === "recetario") { ocultarTodo(); document.getElementById("vistaAreas").classList.remove("hidden"); renderAreas(); }
     else { AREA_ACTIVA = null; ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); document.getElementById("buscar").value = ""; renderLista(); }
+    renderCarritoBar();
     window.scrollTo({ top: 0 });
   });
 });
@@ -184,10 +221,18 @@ document.getElementById("btnVolverHomeDesdeAreas").addEventListener("click", irA
 document.getElementById("btnVolverLista").addEventListener("click", () => {
   if (MODO === "recetario" && AREA_ACTIVA) { ocultarTodo(); document.getElementById("vistaAreas").classList.remove("hidden"); renderAreas(); }
   else irAHome();
+  renderCarritoBar();
 });
-document.getElementById("btnVolverDetalle").addEventListener("click", () => { ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); });
-document.getElementById("btnVolverCalc").addEventListener("click", () => { ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); });
-document.getElementById("btnVolverProd").addEventListener("click", () => { ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); });
+document.getElementById("btnVolverDetalle").addEventListener("click", () => { ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); renderCarritoBar(); });
+document.getElementById("btnVolverCalc").addEventListener("click", () => { ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); renderCarritoBar(); });
+document.getElementById("btnVolverProd").addEventListener("click", () => { ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); renderCarritoBar(); });
+document.getElementById("btnVolverCarrito").addEventListener("click", () => { ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); renderLista(); renderCarritoBar(); });
+document.getElementById("btnVaciarCarrito").addEventListener("click", () => {
+  if (!confirm("¿Vaciar toda la lista combinada?")) return;
+  CARRITO = [];
+  renderCarrito();
+  renderCarritoBar();
+});
 
 async function cargarRecetas() {
   const [recetas, ingredientes] = await Promise.all([
@@ -253,6 +298,7 @@ function elegirReceta(id) {
   if (MODO === "recetario") abrirDetalle();
   else if (MODO === "calculadora") abrirCalculadora();
   else abrirProduccion();
+  renderCarritoBar();
   window.scrollTo({ top: 0 });
 }
 
@@ -299,7 +345,55 @@ document.getElementById("btnIrAProduccionDesdeCalc").addEventListener("click", (
   ocultarTodo();
   abrirProduccion();
   document.getElementById("prodMultiplicador").value = fmtCantidad(f);
+  renderCarritoBar();
 });
+document.getElementById("btnAgregarCarrito").addEventListener("click", () => {
+  const cantidad = Number(document.getElementById("cantidadDeseada").value) || Number(RECETA_ACTIVA.rendimiento_cantidad) || 1;
+  const item = {
+    recetaId: RECETA_ACTIVA.id, nombre: RECETA_ACTIVA.nombre, area: RECETA_ACTIVA.area, categoria: RECETA_ACTIVA.categoria,
+    cantidadDeseada: cantidad, rendimiento_cantidad: RECETA_ACTIVA.rendimiento_cantidad, rendimiento_unidad: RECETA_ACTIVA.rendimiento_unidad
+  };
+  const idx = CARRITO.findIndex(x => x.recetaId === item.recetaId);
+  if (idx >= 0) CARRITO[idx] = item; else CARRITO.push(item);
+  ocultarTodo();
+  document.getElementById("vistaLista").classList.remove("hidden");
+  renderLista();
+  renderCarritoBar();
+  window.scrollTo({ top: 0 });
+});
+
+// ---- CARRITO (varias recetas combinadas) ----
+function renderCarrito() {
+  document.getElementById("carritoRecetas").innerHTML = CARRITO.map((it, i) => `
+    <div class="ingrediente-row">
+      <span>${it.nombre} <span style="color:var(--ink-soft);">(${it.area})</span></span>
+      <span style="display:flex;align-items:center;gap:10px;">
+        <strong>${fmtCantidad(it.cantidadDeseada)} ${it.rendimiento_unidad}</strong>
+        <button data-i="${i}" class="btnQuitarCarrito" style="border:none;background:none;color:var(--danger);font-size:17px;cursor:pointer;padding:0;">✕</button>
+      </span>
+    </div>`).join("") || '<p class="rinde">Lista vacía.</p>';
+  document.querySelectorAll(".btnQuitarCarrito").forEach(b => b.addEventListener("click", (e) => {
+    CARRITO.splice(Number(e.currentTarget.dataset.i), 1);
+    renderCarrito();
+    renderCarritoBar();
+  }));
+
+  const total = {};
+  CARRITO.forEach(it => {
+    const receta = RECETAS.find(r => r.id === it.recetaId);
+    if (!receta) return;
+    const f = it.cantidadDeseada / (Number(it.rendimiento_cantidad) || 1);
+    receta.ingredientes.forEach(ing => {
+      const key = ing.producto_nombre + "||" + ing.unidad;
+      total[key] = (total[key] || 0) + Number(ing.cantidad) * f;
+    });
+  });
+  const filas = Object.entries(total).sort((a, b) => a[0].localeCompare(b[0]));
+  document.getElementById("carritoIngredientes").innerHTML = filas.map(([key, cant]) => {
+    const [nombre, unidad] = key.split("||");
+    return `<div class="ingrediente-row"><span>${nombre}</span><strong>${fmtCantidad(cant)} ${unidad}</strong></div>`;
+  }).join("") || '<p class="rinde">Agrega recetas desde la calculadora para verlas aquí.</p>';
+}
 
 // ---- PRODUCCIÓN ----
 function abrirProduccion() {
