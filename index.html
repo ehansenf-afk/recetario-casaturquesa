@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recetario Casa Turquesa</title>
+<style>
+  :root { --bg:#0f1115; --paper:#171a21; --line:#2a2e38; --ink:#f2f2f0; --ink-soft:#9aa0ac; --accent:#5fb3a3; --danger:#e5675f; --radius:12px; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; -webkit-tap-highlight-color:transparent; }
+  header { background:linear-gradient(135deg,#0c3a36,#0f1115); padding:22px 18px 18px; }
+  header .eyebrow { font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent); margin:0 0 4px; }
+  header h1 { margin:0; font-size:22px; }
+  main { padding:16px; max-width:640px; margin:0 auto; padding-bottom:80px; }
+  input, select, textarea, button { font-family:inherit; font-size:15px; }
+  input[type=text], input[type=number], input[type=date], select, textarea { width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--paper); color:var(--ink); margin-bottom:10px; }
+  textarea { min-height:60px; resize:vertical; }
+  button { cursor:pointer; }
+  .btn-primary { width:100%; background:var(--accent); color:#0c1a17; border:none; border-radius:10px; padding:14px; font-weight:700; font-size:15px; }
+  .btn-secondary { width:100%; background:none; border:1px solid var(--line); color:var(--ink-soft); border-radius:10px; padding:12px; font-size:14px; }
+  .card { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px; }
+  .card-tap { cursor:pointer; }
+  .card-tap:active { opacity:0.7; }
+  .cat { font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
+  .nombre { font-size:16px; font-weight:700; margin:2px 0; }
+  .rinde { font-size:12.5px; color:var(--ink-soft); }
+  .hidden { display:none !important; }
+  .ingrediente-row { display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line); font-size:14.5px; }
+  .ingrediente-row:last-child { border-bottom:none; }
+  .paso-row { display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .paso-row:last-child { border-bottom:none; }
+  .paso-num { background:var(--accent); color:#0c1a17; font-weight:700; font-size:12.5px; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .back { color:var(--accent); font-size:14px; background:none; border:none; padding:0; margin-bottom:14px; display:flex; align-items:center; gap:6px; }
+  .section-title { font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); margin:20px 0 8px; }
+  .msg { font-size:13px; text-align:center; margin-top:8px; }
+  .top-tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .top-tab { flex:1; text-align:center; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--paper); color:var(--ink-soft); font-size:13px; font-weight:600; }
+  .top-tab.activo { background:var(--accent); color:#0c1a17; border-color:var(--accent); }
+  .prod-item { font-size:12.5px; color:var(--ink-soft); padding:8px 0; border-bottom:1px solid var(--line); }
+  .prod-item:last-child { border-bottom:none; }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">Casa Turquesa · Pastelería</p>
+  <h1 id="headerTitle">🧁 Recetario</h1>
+</header>
+
+<main>
+  <div id="vistaLista">
+    <input type="text" id="buscar" placeholder="🔍 Buscar receta...">
+    <div id="listaRecetas"><p class="rinde">Cargando...</p></div>
+  </div>
+
+  <div id="vistaDetalle" class="hidden">
+    <button class="back" id="btnVolver">← Volver al recetario</button>
+    <div class="cat" id="detCategoria"></div>
+    <h2 id="detNombre" style="margin:2px 0 4px;"></h2>
+    <div class="rinde" id="detRinde"></div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin:16px 0;">
+      <span style="font-size:13px;color:var(--ink-soft);">Escalar receta ×</span>
+      <input type="number" id="multiplicador" value="1" min="0.1" step="any" style="width:90px;margin:0;">
+    </div>
+
+    <div class="section-title">Ingredientes</div>
+    <div class="card" id="listaIngredientes"></div>
+
+    <div class="section-title">Preparación</div>
+    <div class="card" id="listaPasos"></div>
+
+    <div class="section-title">📋 Registrar producción</div>
+    <div class="card">
+      <select id="prodCocinero"><option value="">-- ¿Quién la hizo? --</option></select>
+      <input type="date" id="prodFecha">
+      <textarea id="prodNotas" placeholder="Notas (opcional)"></textarea>
+      <button class="btn-primary" id="btnRegistrarProduccion">Registrar producción</button>
+      <p class="msg" id="prodMsg"></p>
+    </div>
+
+    <div class="section-title">Historial reciente</div>
+    <div class="card" id="prodHistorial"><p class="rinde">Sin registros aún.</p></div>
+  </div>
+</main>
+
+<script>
+const SUPABASE_URL = "https://udsvumfwczyormmprizm.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkc3Z1bWZ3Y3p5b3JtbXByaXptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MTg1MzgsImV4cCI6MjA5NTM5NDUzOH0.h3MzXhUrIkwssCCwWSohg9l40weroZUP81NJ3PLIAxE";
+const H = { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY };
+const HJ = Object.assign({ "Content-Type": "application/json" }, H);
+
+let RECETAS = [];
+let COCINEROS = [];
+let RECETA_ACTIVA = null;
+
+async function cargarRecetas() {
+  const [recetas, ingredientes] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/recetas?negocio=eq.turquesa&activo=eq.true&select=id,nombre,categoria,rendimiento_cantidad,rendimiento_unidad,pasos,notas&order=categoria,nombre`, { headers: H }).then(r => r.json()),
+    fetch(`${SUPABASE_URL}/rest/v1/receta_ingredientes?select=receta_id,producto_nombre,cantidad,unidad,orden&order=orden`, { headers: H }).then(r => r.json())
+  ]);
+  RECETAS = recetas.map(r => ({ ...r, ingredientes: ingredientes.filter(i => i.receta_id === r.id) }));
+  renderLista();
+}
+
+async function cargarCocineros() {
+  try {
+    const filas = await fetch(`${SUPABASE_URL}/rest/v1/trabajadores_rrhh?negocio=eq.turquesa&estado=eq.activo&select=nombre,apellido&order=nombre`, { headers: H }).then(r => r.json());
+    COCINEROS = Array.isArray(filas) ? filas : [];
+  } catch (e) { COCINEROS = []; }
+  const sel = document.getElementById("prodCocinero");
+  sel.innerHTML = '<option value="">-- ¿Quién la hizo? --</option>' + COCINEROS.map(c => `<option value="${(c.nombre + ' ' + (c.apellido||'')).trim()}">${c.nombre} ${c.apellido||''}</option>`).join("") + '<option value="__otro__">Otra persona...</option>';
+}
+
+function renderLista() {
+  const q = (document.getElementById("buscar").value || "").trim().toLowerCase();
+  const wrap = document.getElementById("listaRecetas");
+  const filtradas = RECETAS.filter(r => !q || r.nombre.toLowerCase().includes(q) || (r.categoria||"").toLowerCase().includes(q));
+  if (!filtradas.length) { wrap.innerHTML = '<p class="rinde">Sin recetas aún.</p>'; return; }
+  const porCategoria = {};
+  filtradas.forEach(r => { (porCategoria[r.categoria || "Otras"] ||= []).push(r); });
+  wrap.innerHTML = Object.entries(porCategoria).map(([cat, items]) => `
+    <div class="section-title">${cat}</div>
+    ${items.map(r => `
+      <div class="card card-tap" data-id="${r.id}">
+        <div class="nombre">${r.nombre}</div>
+        <div class="rinde">Rinde ${r.rendimiento_cantidad} ${r.rendimiento_unidad}</div>
+      </div>`).join("")}
+  `).join("");
+  wrap.querySelectorAll(".card-tap").forEach(el => el.addEventListener("click", () => abrirReceta(el.dataset.id)));
+}
+document.getElementById("buscar").addEventListener("input", renderLista);
+
+function factorEscala() { return Number(document.getElementById("multiplicador").value) || 1; }
+
+function fmtCantidad(n) {
+  return Number(n.toFixed(2)).toString();
+}
+
+function renderIngredientesYPasos() {
+  const r = RECETA_ACTIVA;
+  const f = factorEscala();
+  document.getElementById("listaIngredientes").innerHTML = r.ingredientes.map(i => `
+    <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${fmtCantidad(Number(i.cantidad) * f)} ${i.unidad}</strong></div>
+  `).join("") || '<p class="rinde">Sin ingredientes cargados.</p>';
+
+  document.getElementById("listaPasos").innerHTML = (r.pasos || []).map((p, i) => `
+    <div class="paso-row"><div class="paso-num">${i+1}</div><div>${p}</div></div>
+  `).join("") + (r.notas ? `<div class="paso-row"><div class="paso-num">⚠️</div><div style="color:var(--ink-soft);">${r.notas}</div></div>` : "");
+}
+document.getElementById("multiplicador").addEventListener("input", renderIngredientesYPasos);
+
+function abrirReceta(id) {
+  RECETA_ACTIVA = RECETAS.find(r => r.id === id);
+  if (!RECETA_ACTIVA) return;
+  document.getElementById("vistaLista").classList.add("hidden");
+  document.getElementById("vistaDetalle").classList.remove("hidden");
+  document.getElementById("detCategoria").textContent = RECETA_ACTIVA.categoria || "";
+  document.getElementById("detNombre").textContent = RECETA_ACTIVA.nombre;
+  document.getElementById("detRinde").textContent = `Rinde ${RECETA_ACTIVA.rendimiento_cantidad} ${RECETA_ACTIVA.rendimiento_unidad}`;
+  document.getElementById("multiplicador").value = "1";
+  document.getElementById("prodFecha").valueAsDate = new Date();
+  document.getElementById("prodNotas").value = "";
+  document.getElementById("prodMsg").textContent = "";
+  renderIngredientesYPasos();
+  cargarHistorial(RECETA_ACTIVA.id);
+  window.scrollTo({ top: 0 });
+}
+document.getElementById("btnVolver").addEventListener("click", () => {
+  document.getElementById("vistaDetalle").classList.add("hidden");
+  document.getElementById("vistaLista").classList.remove("hidden");
+});
+
+document.getElementById("prodCocinero").addEventListener("change", (e) => {
+  if (e.target.value === "__otro__") {
+    const nombre = prompt("Nombre de quien hizo la producción:");
+    if (nombre) {
+      const opt = document.createElement("option");
+      opt.value = nombre; opt.textContent = nombre; opt.selected = true;
+      e.target.insertBefore(opt, e.target.lastElementChild);
+    } else {
+      e.target.value = "";
+    }
+  }
+});
+
+async function registrarProduccion() {
+  const cocinero = document.getElementById("prodCocinero").value;
+  if (!cocinero) { alert("Elige quién hizo la producción."); return; }
+  const msg = document.getElementById("prodMsg");
+  msg.textContent = "Guardando...";
+  const payload = {
+    receta_id: RECETA_ACTIVA.id,
+    fecha: document.getElementById("prodFecha").value || new Date().toISOString().slice(0,10),
+    multiplicador: factorEscala(),
+    realizado_por: cocinero,
+    notas: document.getElementById("prodNotas").value.trim() || null
+  };
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/producciones_recetas`, { method: "POST", headers: Object.assign({ Prefer: "return=minimal" }, HJ), body: JSON.stringify(payload) });
+    msg.style.color = "var(--accent)";
+    msg.textContent = "✅ Producción registrada.";
+    document.getElementById("prodNotas").value = "";
+    cargarHistorial(RECETA_ACTIVA.id);
+  } catch (e) {
+    msg.style.color = "var(--danger)";
+    msg.textContent = "Error al guardar.";
+  }
+}
+document.getElementById("btnRegistrarProduccion").addEventListener("click", registrarProduccion);
+
+async function cargarHistorial(recetaId) {
+  const wrap = document.getElementById("prodHistorial");
+  wrap.innerHTML = '<p class="rinde">Cargando...</p>';
+  try {
+    const filas = await fetch(`${SUPABASE_URL}/rest/v1/producciones_recetas?receta_id=eq.${recetaId}&select=fecha,multiplicador,realizado_por,notas&order=fecha.desc&limit=10`, { headers: H }).then(r => r.json());
+    if (!Array.isArray(filas) || !filas.length) { wrap.innerHTML = '<p class="rinde">Sin registros aún.</p>'; return; }
+    wrap.innerHTML = filas.map(f => `<div class="prod-item"><strong style="color:var(--ink);">${f.fecha}</strong> · ×${f.multiplicador} · ${f.realizado_por || "—"}${f.notas ? "<br>" + f.notas : ""}</div>`).join("");
+  } catch (e) { wrap.innerHTML = '<p class="rinde">Error al cargar.</p>'; }
+}
+
+cargarRecetas();
+cargarCocineros();
+</script>
+</body>
+</html>
