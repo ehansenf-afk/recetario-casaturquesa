@@ -42,6 +42,9 @@
   .paso-num { background:var(--accent); color:#0c1a17; font-weight:700; font-size:12.5px; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .back { color:var(--accent); font-size:14px; background:none; border:none; padding:0; margin-bottom:14px; display:flex; align-items:center; gap:6px; }
   .section-title { font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); margin:20px 0 8px; }
+  .section-title-toggle { cursor:pointer; display:flex; align-items:center; gap:6px; user-select:none; }
+  .section-title-toggle:active { opacity:0.7; }
+  .toggle-arrow { font-size:10px; }
   .msg { font-size:13px; text-align:center; margin-top:8px; }
   .prod-item { font-size:12.5px; color:var(--ink-soft); padding:8px 0; border-bottom:1px solid var(--line); }
   .prod-item:last-child { border-bottom:none; }
@@ -172,6 +175,7 @@ let RECETA_ACTIVA = null;
 let AREA_ACTIVA = null;
 let MODO = null; // 'calculadora' | 'recetario' | 'produccion'
 let CARRITO = []; // { recetaId, nombre, area, categoria, cantidadDeseada, rendimiento_cantidad, rendimiento_unidad }
+let GRUPOS_EXPANDIDOS = new Set();
 
 const AREAS = [
   { nombre: "Pastelería", emoji: "🧁" },
@@ -211,6 +215,7 @@ function irAHome() {
 document.querySelectorAll(".modo-card").forEach(el => {
   el.addEventListener("click", () => {
     MODO = el.dataset.modo;
+    GRUPOS_EXPANDIDOS.clear();
     if (MODO === "recetario") { ocultarTodo(); document.getElementById("vistaAreas").classList.remove("hidden"); renderAreas(); }
     else { AREA_ACTIVA = null; ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden"); document.getElementById("buscar").value = ""; renderLista(); }
     renderCarritoBar();
@@ -253,6 +258,7 @@ function renderAreas() {
   }).join("");
   wrap.querySelectorAll(".area-card").forEach(el => el.addEventListener("click", () => {
     AREA_ACTIVA = el.dataset.area;
+    GRUPOS_EXPANDIDOS.clear();
     ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden");
     document.getElementById("buscar").value = "";
     document.getElementById("headerEyebrow").textContent = "Casa Turquesa · " + AREA_ACTIVA;
@@ -279,15 +285,26 @@ function renderLista() {
   const agruparPor = MODO === "recetario" ? (r => r.categoria || "Otras") : (r => r.area + (r.categoria ? " · " + r.categoria : ""));
   const grupos = {};
   filtradas.forEach(r => { (grupos[agruparPor(r)] ||= []).push(r); });
-  wrap.innerHTML = Object.entries(grupos).map(([g, items]) => `
-    <div class="section-title">${g}</div>
-    ${items.map(r => `
-      <div class="card card-tap" data-id="${r.id}">
-        <div class="nombre">${r.nombre}</div>
-        <div class="rinde">Rinde ${r.rendimiento_cantidad} ${r.rendimiento_unidad}</div>
-      </div>`).join("")}
-  `).join("");
+  wrap.innerHTML = Object.entries(grupos).map(([g, items]) => {
+    const expandido = q.length > 0 || GRUPOS_EXPANDIDOS.has(g);
+    return `
+    <div class="section-title section-title-toggle" data-grupo="${g}">
+      <span class="toggle-arrow">${expandido ? "▾" : "▸"}</span>${g} <span style="font-weight:400;">(${items.length})</span>
+    </div>
+    <div class="grupo-items ${expandido ? "" : "hidden"}" data-grupo-items="${g}">
+      ${items.map(r => `
+        <div class="card card-tap" data-id="${r.id}">
+          <div class="nombre">${r.nombre}</div>
+          <div class="rinde">Rinde ${r.rendimiento_cantidad} ${r.rendimiento_unidad}</div>
+        </div>`).join("")}
+    </div>`;
+  }).join("");
   wrap.querySelectorAll(".card-tap").forEach(el => el.addEventListener("click", () => elegirReceta(el.dataset.id)));
+  wrap.querySelectorAll(".section-title-toggle").forEach(el => el.addEventListener("click", () => {
+    const g = el.dataset.grupo;
+    if (GRUPOS_EXPANDIDOS.has(g)) GRUPOS_EXPANDIDOS.delete(g); else GRUPOS_EXPANDIDOS.add(g);
+    renderLista();
+  }));
 }
 document.getElementById("buscar").addEventListener("input", renderLista);
 
