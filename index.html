@@ -81,14 +81,21 @@
   <!-- Menú de almuerzo del día -->
   <div id="vistaMenuDiario" class="hidden">
     <button class="back" id="btnVolverMenuDiario">← Inicio</button>
-    <h2 style="margin:2px 0 4px;">🍽️ Menú de almuerzo de hoy</h2>
+    <h2 style="margin:2px 0 4px;">🍽️ Menú de almuerzo</h2>
     <div class="rinde" style="margin-bottom:14px;">Para que quede registrado, te vamos a pedir tu WhatsApp y te mandamos un mensaje para confirmar que fuiste tú quien lo subió.</div>
     <input type="text" id="menuTelefono" placeholder="Tu WhatsApp (ej. 989007295)">
-    <input type="text" id="menuEntrada1" placeholder="Entrada 1">
-    <input type="text" id="menuEntrada2" placeholder="Entrada 2">
-    <input type="text" id="menuMenu1" placeholder="Menú 1">
-    <input type="text" id="menuMenu2" placeholder="Menú 2">
-    <button class="btn-primary" id="btnEnviarMenuDiario">Enviar y confirmar por WhatsApp</button>
+    <div class="section-title" style="margin-top:10px;">¿Para qué día es este menú?</div>
+    <input type="date" id="menuFecha">
+
+    <div class="section-title">Entradas (mínimo 2)</div>
+    <div id="menuEntradasWrap"></div>
+    <button class="btn-secondary" id="btnAgregarEntrada" style="margin-bottom:10px;">+ Agregar otra entrada</button>
+
+    <div class="section-title">Menús / fondos (mínimo 2)</div>
+    <div id="menuMenusWrap"></div>
+    <button class="btn-secondary" id="btnAgregarMenu" style="margin-bottom:10px;">+ Agregar otro menú</button>
+
+    <button class="btn-primary" id="btnEnviarMenuDiario" style="margin-top:10px;">Enviar y confirmar por WhatsApp</button>
     <p class="msg" id="menuDiarioMsg"></p>
   </div>
 
@@ -494,29 +501,51 @@ async function cargarHistorial(recetaId) {
   } catch (e) { wrap.innerHTML = '<p class="rinde">Error al cargar.</p>'; }
 }
 
+function renderCampoLista(wrapId, placeholderBase, minimo) {
+  const wrap = document.getElementById(wrapId);
+  const n = wrap.children.length;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = placeholderBase + " " + (n + 1);
+  input.className = "campoListaMenu";
+  wrap.appendChild(input);
+}
+function reiniciarListasMenu() {
+  document.getElementById("menuEntradasWrap").innerHTML = "";
+  document.getElementById("menuMenusWrap").innerHTML = "";
+  renderCampoLista("menuEntradasWrap", "Entrada", 2);
+  renderCampoLista("menuEntradasWrap", "Entrada", 2);
+  renderCampoLista("menuMenusWrap", "Menú", 2);
+  renderCampoLista("menuMenusWrap", "Menú", 2);
+}
+document.getElementById("btnAgregarEntrada").addEventListener("click", () => renderCampoLista("menuEntradasWrap", "Entrada"));
+document.getElementById("btnAgregarMenu").addEventListener("click", () => renderCampoLista("menuMenusWrap", "Menú"));
+
 function abrirMenuDiario() {
   ocultarTodo();
   document.getElementById("vistaMenuDiario").classList.remove("hidden");
   document.getElementById("menuDiarioMsg").textContent = "";
+  document.getElementById("menuFecha").valueAsDate = new Date();
+  reiniciarListasMenu();
   window.scrollTo({ top: 0 });
 }
 document.getElementById("btnAbrirMenuDiario").addEventListener("click", abrirMenuDiario);
 document.getElementById("btnVolverMenuDiario").addEventListener("click", irAHome);
 document.getElementById("btnEnviarMenuDiario").addEventListener("click", async () => {
   const telefono = document.getElementById("menuTelefono").value.trim();
-  const entrada_1 = document.getElementById("menuEntrada1").value.trim();
-  const entrada_2 = document.getElementById("menuEntrada2").value.trim();
-  const menu_1 = document.getElementById("menuMenu1").value.trim();
-  const menu_2 = document.getElementById("menuMenu2").value.trim();
+  const fecha = document.getElementById("menuFecha").value;
+  const entradas = [...document.querySelectorAll("#menuEntradasWrap .campoListaMenu")].map(i => i.value.trim()).filter(Boolean);
+  const menus = [...document.querySelectorAll("#menuMenusWrap .campoListaMenu")].map(i => i.value.trim()).filter(Boolean);
   const msg = document.getElementById("menuDiarioMsg");
   if (!telefono) { msg.style.color = "var(--danger)"; msg.textContent = "Ingresa tu WhatsApp."; return; }
-  if (!menu_1 && !menu_2) { msg.style.color = "var(--danger)"; msg.textContent = "Ingresa al menos un menú."; return; }
+  if (!fecha) { msg.style.color = "var(--danger)"; msg.textContent = "Elige la fecha del menú."; return; }
+  if (!menus.length) { msg.style.color = "var(--danger)"; msg.textContent = "Ingresa al menos un menú."; return; }
   msg.style.color = "var(--ink-soft)";
   msg.textContent = "Enviando...";
   try {
     const res = await fetch("https://mis-negocios-n8n.u7xiga.easypanel.host/webhook/menu-almuerzo-submit", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ telefono, entrada_1, entrada_2, menu_1, menu_2 })
+      body: JSON.stringify({ telefono, fecha, entradas, menus })
     }).then(r => r.json());
     if (res && res.ok) {
       msg.style.color = "var(--accent)";
