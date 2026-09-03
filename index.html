@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Recetario Casa Turquesa</title>
 <style>
-  :root { --bg:#faf7f2; --paper:#ffffff; --line:#e7e0d6; --ink:#2c2a26; --ink-soft:#8a8377; --accent:#4fa393; --accent-ink:#ffffff; --danger:#d9564d; --radius:12px; }
+  :root { --bg:#faf7f2; --paper:#ffffff; --line:#e7e0d6; --ink:#2c2a26; --ink-soft:#8a8377; --accent:#4fa393; --accent-ink:#ffffff; --danger:#d9564d; --warn:#c98a2c; --radius:12px; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; -webkit-tap-highlight-color:transparent; }
   header { background:linear-gradient(135deg,#eaf6f3,#faf7f2); padding:22px 18px 18px; border-bottom:1px solid var(--line); }
@@ -72,15 +72,23 @@
       <div class="modo-emoji">📋</div>
       <div><div class="modo-nombre">Producción</div><div class="modo-desc">Registrar lo que hiciste y ver el historial</div></div>
     </div>
-    <div class="modo-card" id="btnAbrirMenuDiario">
+    <div class="modo-card" id="btnAbrirCalendarioMenu">
       <div class="modo-emoji">🍽️</div>
-      <div><div class="modo-nombre">Menú de almuerzo de hoy</div><div class="modo-desc">Subir entradas y menús del día</div></div>
+      <div><div class="modo-nombre">Menú de almuerzo</div><div class="modo-desc">Ver la semana y cargar entradas/menús por día</div></div>
     </div>
+  </div>
+
+  <!-- Calendario semanal del menú -->
+  <div id="vistaMenuCalendario" class="hidden">
+    <button class="back" id="btnVolverMenuCalendario">← Inicio</button>
+    <h2 style="margin:2px 0 4px;">📅 Menú de almuerzo — esta semana</h2>
+    <div class="rinde" style="margin-bottom:14px;">Toca un día para cargar o revisar su menú.</div>
+    <div id="menuCalendarioWrap"></div>
   </div>
 
   <!-- Menú de almuerzo del día -->
   <div id="vistaMenuDiario" class="hidden">
-    <button class="back" id="btnVolverMenuDiario">← Inicio</button>
+    <button class="back" id="btnVolverMenuDiario">← Semana</button>
     <h2 style="margin:2px 0 4px;">🍽️ Menú de almuerzo</h2>
     <div class="rinde" style="margin-bottom:14px;">Para que quede registrado, te vamos a pedir tu WhatsApp y te mandamos un mensaje para confirmar que fuiste tú quien lo subió.</div>
     <input type="text" id="menuTelefono" placeholder="Tu WhatsApp (ej. 989007295)">
@@ -212,7 +220,7 @@ const AREAS = [
 ];
 
 function fmtCantidad(n) { return Number(n.toFixed(2)).toString(); }
-const VISTAS = ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito","vistaMenuDiario"];
+const VISTAS = ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito","vistaMenuCalendario","vistaMenuDiario"];
 function ocultarTodo() {
   VISTAS.forEach(id => document.getElementById(id).classList.add("hidden"));
 }
@@ -521,16 +529,72 @@ function reiniciarListasMenu() {
 document.getElementById("btnAgregarEntrada").addEventListener("click", () => renderCampoLista("menuEntradasWrap", "Entrada"));
 document.getElementById("btnAgregarMenu").addEventListener("click", () => renderCampoLista("menuMenusWrap", "Menú"));
 
-function abrirMenuDiario() {
+function abrirMenuDiario(fechaStr) {
   ocultarTodo();
   document.getElementById("vistaMenuDiario").classList.remove("hidden");
   document.getElementById("menuDiarioMsg").textContent = "";
-  document.getElementById("menuFecha").valueAsDate = new Date();
+  document.getElementById("menuFecha").value = fechaStr || new Date().toLocaleDateString("en-CA");
   reiniciarListasMenu();
+  const fila = MENU_SEMANA_CACHE.find(f => f.fecha === (fechaStr || new Date().toLocaleDateString("en-CA")));
+  if (fila) {
+    fila.entradas.forEach((e, i) => { if (i >= 2) renderCampoLista("menuEntradasWrap", "Entrada"); document.querySelectorAll("#menuEntradasWrap .campoListaMenu")[i].value = e; });
+    fila.menus.forEach((m, i) => { if (i >= 2) renderCampoLista("menuMenusWrap", "Menú"); document.querySelectorAll("#menuMenusWrap .campoListaMenu")[i].value = m; });
+  }
   window.scrollTo({ top: 0 });
 }
-document.getElementById("btnAbrirMenuDiario").addEventListener("click", abrirMenuDiario);
-document.getElementById("btnVolverMenuDiario").addEventListener("click", irAHome);
+document.getElementById("btnVolverMenuDiario").addEventListener("click", abrirMenuCalendario);
+
+let MENU_SEMANA_CACHE = [];
+function lunesDeLaSemana(d) {
+  const date = new Date(d);
+  const dia = date.getDay();
+  const diff = (dia === 0 ? -6 : 1) - dia;
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+function fmtFechaCorta(fecha) {
+  const [y, m, d] = fecha.split("-");
+  return d + "/" + m;
+}
+async function abrirMenuCalendario() {
+  ocultarTodo();
+  document.getElementById("vistaMenuCalendario").classList.remove("hidden");
+  window.scrollTo({ top: 0 });
+  const wrap = document.getElementById("menuCalendarioWrap");
+  wrap.innerHTML = '<p class="rinde">Cargando...</p>';
+  const lunes = lunesDeLaSemana(new Date());
+  const dias = [];
+  for (let i = 0; i < 7; i++) { const d = new Date(lunes); d.setDate(d.getDate() + i); dias.push(d.toLocaleDateString("en-CA")); }
+  const hoy = new Date().toLocaleDateString("en-CA");
+  const NOMBRES = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+  try {
+    const filas = await fetch(`${SUPABASE_URL}/rest/v1/menu_diario?negocio=eq.turquesa&fecha=in.(${dias.join(",")})&select=fecha,entradas,menus,estado`, { headers: H }).then(r => r.json());
+    MENU_SEMANA_CACHE = Array.isArray(filas) ? filas : [];
+  } catch (e) { MENU_SEMANA_CACHE = []; }
+  wrap.innerHTML = dias.map(fecha => {
+    const fila = MENU_SEMANA_CACHE.find(f => f.fecha === fecha);
+    const esHoy = fecha === hoy;
+    const esPasado = fecha < hoy;
+    const nombreDia = NOMBRES[new Date(fecha + "T12:00:00").getDay()];
+    let badge = '<span style="font-size:11px;color:var(--ink-soft);">Sin menú cargado</span>';
+    let cuerpo = "";
+    if (fila) {
+      if (fila.estado === "confirmado") badge = '<span style="font-size:11px;color:var(--accent);font-weight:700;">✅ Confirmado</span>';
+      else badge = '<span style="font-size:11px;color:var(--warn);font-weight:700;">⏳ Pendiente de confirmar</span>';
+      cuerpo = `<div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px;">${(fila.entradas||[]).join(" · ")}</div><div style="font-size:12.5px;margin-top:2px;">${(fila.menus||[]).join(" · ")}</div>`;
+    }
+    return `<div class="card card-tap diaMenuCard" data-fecha="${fecha}" style="${esHoy ? "border-color:var(--accent);" : ""}${esPasado ? "opacity:0.6;" : ""}">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div><strong>${nombreDia}</strong> <span style="color:var(--ink-soft);font-size:12.5px;">${fmtFechaCorta(fecha)}${esHoy ? " · hoy" : ""}</span></div>
+        ${badge}
+      </div>
+      ${cuerpo}
+    </div>`;
+  }).join("");
+  wrap.querySelectorAll(".diaMenuCard").forEach(el => el.addEventListener("click", () => abrirMenuDiario(el.dataset.fecha)));
+}
+document.getElementById("btnAbrirCalendarioMenu").addEventListener("click", abrirMenuCalendario);
+document.getElementById("btnVolverMenuCalendario").addEventListener("click", irAHome);
 document.getElementById("btnEnviarMenuDiario").addEventListener("click", async () => {
   const telefono = document.getElementById("menuTelefono").value.trim();
   const fecha = document.getElementById("menuFecha").value;
