@@ -83,7 +83,7 @@
   <!-- Lista de recetas (usada por Recetario dentro de un área, y por Calculadora/Producción con todas) -->
   <div id="vistaLista" class="hidden">
     <button class="back" id="btnVolverLista">← Volver</button>
-    <input type="text" id="buscar" placeholder="🔍 Buscar receta...">
+    <input type="text" id="buscar" placeholder="🔍 Buscar receta o ingrediente...">
     <div id="listaRecetas"><p class="rinde">Cargando...</p></div>
   </div>
 
@@ -95,6 +95,7 @@
     <div class="cat" id="detCategoria"></div>
     <h2 id="detNombre" style="margin:2px 0 4px;"></h2>
     <div class="rinde" id="detRinde"></div>
+    <img id="detFoto" class="hidden" style="width:100%;border-radius:var(--radius);margin:10px 0;object-fit:cover;max-height:220px;">
 
     <div class="section-title">Ingredientes (receta base)</div>
     <div class="card" id="listaIngredientes"></div>
@@ -241,7 +242,7 @@ document.getElementById("btnVaciarCarrito").addEventListener("click", () => {
 
 async function cargarRecetas() {
   const [recetas, ingredientes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/recetas?negocio=eq.turquesa&activo=eq.true&select=id,nombre,area,categoria,rendimiento_cantidad,rendimiento_unidad,pasos,notas&order=area,categoria,nombre`, { headers: H }).then(r => r.json()),
+    fetch(`${SUPABASE_URL}/rest/v1/recetas?negocio=eq.turquesa&activo=eq.true&select=id,nombre,area,categoria,rendimiento_cantidad,rendimiento_unidad,pasos,notas,foto_url&order=area,categoria,nombre`, { headers: H }).then(r => r.json()),
     fetch(`${SUPABASE_URL}/rest/v1/receta_ingredientes?select=receta_id,producto_nombre,cantidad,unidad,orden&order=orden`, { headers: H }).then(r => r.json())
   ]);
   RECETAS = recetas.map(r => ({ ...r, ingredientes: ingredientes.filter(i => i.receta_id === r.id) }));
@@ -280,7 +281,7 @@ function renderLista() {
   const q = (document.getElementById("buscar").value || "").trim().toLowerCase();
   const wrap = document.getElementById("listaRecetas");
   const base = MODO === "recetario" ? RECETAS.filter(r => r.area === AREA_ACTIVA) : RECETAS;
-  const filtradas = base.filter(r => !q || r.nombre.toLowerCase().includes(q) || (r.categoria||"").toLowerCase().includes(q) || (r.area||"").toLowerCase().includes(q));
+  const filtradas = base.filter(r => !q || r.nombre.toLowerCase().includes(q) || (r.categoria||"").toLowerCase().includes(q) || (r.area||"").toLowerCase().includes(q) || r.ingredientes.some(i => (i.producto_nombre||"").toLowerCase().includes(q)));
   if (!filtradas.length) { wrap.innerHTML = '<p class="rinde">Sin recetas.</p>'; return; }
   const agruparPor = MODO === "recetario" ? (r => r.categoria || "Otras") : (r => r.area + (r.categoria ? " · " + r.categoria : ""));
   const grupos = {};
@@ -325,6 +326,8 @@ function abrirDetalle() {
   document.getElementById("detCategoria").textContent = RECETA_ACTIVA.area + (RECETA_ACTIVA.categoria ? " · " + RECETA_ACTIVA.categoria : "");
   document.getElementById("detNombre").textContent = RECETA_ACTIVA.nombre;
   document.getElementById("detRinde").textContent = `Rinde ${RECETA_ACTIVA.rendimiento_cantidad} ${RECETA_ACTIVA.rendimiento_unidad}`;
+  const detFoto = document.getElementById("detFoto");
+  if (RECETA_ACTIVA.foto_url) { detFoto.src = RECETA_ACTIVA.foto_url; detFoto.classList.remove("hidden"); } else { detFoto.classList.add("hidden"); }
   document.getElementById("listaIngredientes").innerHTML = RECETA_ACTIVA.ingredientes.map(i => `
     <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${i.cantidad} ${i.unidad}</strong></div>
   `).join("") || '<p class="rinde">Sin ingredientes cargados.</p>';
