@@ -72,6 +72,24 @@
       <div class="modo-emoji">📋</div>
       <div><div class="modo-nombre">Producción</div><div class="modo-desc">Registrar lo que hiciste y ver el historial</div></div>
     </div>
+    <div class="modo-card" id="btnAbrirMenuDiario">
+      <div class="modo-emoji">🍽️</div>
+      <div><div class="modo-nombre">Menú de almuerzo de hoy</div><div class="modo-desc">Subir entradas y menús del día</div></div>
+    </div>
+  </div>
+
+  <!-- Menú de almuerzo del día -->
+  <div id="vistaMenuDiario" class="hidden">
+    <button class="back" id="btnVolverMenuDiario">← Inicio</button>
+    <h2 style="margin:2px 0 4px;">🍽️ Menú de almuerzo de hoy</h2>
+    <div class="rinde" style="margin-bottom:14px;">Para que quede registrado, te vamos a pedir tu WhatsApp y te mandamos un mensaje para confirmar que fuiste tú quien lo subió.</div>
+    <input type="text" id="menuTelefono" placeholder="Tu WhatsApp (ej. 989007295)">
+    <input type="text" id="menuEntrada1" placeholder="Entrada 1">
+    <input type="text" id="menuEntrada2" placeholder="Entrada 2">
+    <input type="text" id="menuMenu1" placeholder="Menú 1">
+    <input type="text" id="menuMenu2" placeholder="Menú 2">
+    <button class="btn-primary" id="btnEnviarMenuDiario">Enviar y confirmar por WhatsApp</button>
+    <p class="msg" id="menuDiarioMsg"></p>
   </div>
 
   <!-- RECETARIO: areas -->
@@ -187,11 +205,12 @@ const AREAS = [
 ];
 
 function fmtCantidad(n) { return Number(n.toFixed(2)).toString(); }
+const VISTAS = ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito","vistaMenuDiario"];
 function ocultarTodo() {
-  ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito"].forEach(id => document.getElementById(id).classList.add("hidden"));
+  VISTAS.forEach(id => document.getElementById(id).classList.add("hidden"));
 }
 function vistaActiva() {
-  return ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito"].find(id => !document.getElementById(id).classList.contains("hidden"));
+  return VISTAS.find(id => !document.getElementById(id).classList.contains("hidden"));
 }
 function renderCarritoBar() {
   const bar = document.getElementById("carritoBar");
@@ -475,8 +494,46 @@ async function cargarHistorial(recetaId) {
   } catch (e) { wrap.innerHTML = '<p class="rinde">Error al cargar.</p>'; }
 }
 
+function abrirMenuDiario() {
+  ocultarTodo();
+  document.getElementById("vistaMenuDiario").classList.remove("hidden");
+  document.getElementById("menuDiarioMsg").textContent = "";
+  window.scrollTo({ top: 0 });
+}
+document.getElementById("btnAbrirMenuDiario").addEventListener("click", abrirMenuDiario);
+document.getElementById("btnVolverMenuDiario").addEventListener("click", irAHome);
+document.getElementById("btnEnviarMenuDiario").addEventListener("click", async () => {
+  const telefono = document.getElementById("menuTelefono").value.trim();
+  const entrada_1 = document.getElementById("menuEntrada1").value.trim();
+  const entrada_2 = document.getElementById("menuEntrada2").value.trim();
+  const menu_1 = document.getElementById("menuMenu1").value.trim();
+  const menu_2 = document.getElementById("menuMenu2").value.trim();
+  const msg = document.getElementById("menuDiarioMsg");
+  if (!telefono) { msg.style.color = "var(--danger)"; msg.textContent = "Ingresa tu WhatsApp."; return; }
+  if (!menu_1 && !menu_2) { msg.style.color = "var(--danger)"; msg.textContent = "Ingresa al menos un menú."; return; }
+  msg.style.color = "var(--ink-soft)";
+  msg.textContent = "Enviando...";
+  try {
+    const res = await fetch("https://mis-negocios-n8n.u7xiga.easypanel.host/webhook/menu-almuerzo-submit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ telefono, entrada_1, entrada_2, menu_1, menu_2 })
+    }).then(r => r.json());
+    if (res && res.ok) {
+      msg.style.color = "var(--accent)";
+      msg.textContent = "✅ Listo, revisa tu WhatsApp y responde SI para confirmar.";
+    } else {
+      msg.style.color = "var(--danger)";
+      msg.textContent = "No se pudo enviar (" + (res && res.error || "revisa el número") + ").";
+    }
+  } catch (e) {
+    msg.style.color = "var(--danger)";
+    msg.textContent = "Error al enviar.";
+  }
+});
+
 cargarRecetas();
 cargarCocineros();
+if (new URLSearchParams(location.search).get("menu")) abrirMenuDiario();
 </script>
 </body>
 </html>
