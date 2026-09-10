@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Recetario Casa Turquesa</title>
 <style>
   :root { --bg:#faf7f2; --paper:#ffffff; --line:#e7e0d6; --ink:#2c2a26; --ink-soft:#8a8377; --accent:#4fa393; --accent-ink:#ffffff; --danger:#d9564d; --warn:#c98a2c; --radius:12px; }
@@ -23,7 +23,7 @@
   .area-count { font-size:12px; color:var(--ink-soft); margin-top:2px; }
   main { padding:16px; max-width:640px; margin:0 auto; padding-bottom:80px; }
   input, select, textarea, button { font-family:inherit; font-size:15px; }
-  input[type=text], input[type=number], input[type=date], select, textarea { width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--paper); color:var(--ink); margin-bottom:10px; }
+  input[type=text], input[type=number], input[type=date], select, textarea { width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--paper); color:var(--ink); margin-bottom:10px; font-size:16px; }
   textarea { min-height:60px; resize:vertical; }
   button { cursor:pointer; }
   .btn-primary { width:100%; background:var(--accent); color:#0c1a17; border:none; border-radius:10px; padding:14px; font-weight:700; font-size:15px; }
@@ -40,7 +40,7 @@
   .paso-row { display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
   .paso-row:last-child { border-bottom:none; }
   .paso-num { background:var(--accent); color:#0c1a17; font-weight:700; font-size:12.5px; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-  .back { color:var(--accent); font-size:14px; background:none; border:none; padding:0; margin-bottom:14px; display:flex; align-items:center; gap:6px; }
+  .back { color:var(--accent); font-size:14px; background:none; border:none; padding:10px 0; margin:-10px 0 4px; display:flex; align-items:center; gap:6px; }
   .section-title { font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); margin:20px 0 8px; }
   .section-title-toggle { cursor:pointer; display:flex; align-items:center; gap:6px; user-select:none; }
   .section-title-toggle:active { opacity:0.7; }
@@ -120,7 +120,12 @@
     <div id="listaRecetas"><p class="rinde">Cargando...</p></div>
   </div>
 
-  <div id="carritoBar" class="hidden" style="position:fixed;left:0;right:0;bottom:0;background:var(--accent);color:#0c1a17;padding:14px 16px;text-align:center;font-weight:700;cursor:pointer;z-index:10;">🧺 Ver lista combinada (<span id="carritoCount">0</span>)</div>
+  <div id="carritoBar" class="hidden" style="position:fixed;left:0;right:0;bottom:0;background:var(--accent);color:#0c1a17;padding:14px 16px calc(14px + env(safe-area-inset-bottom));text-align:center;font-weight:700;cursor:pointer;z-index:10;">🧺 Ver lista combinada (<span id="carritoCount">0</span>)</div>
+
+  <div id="lightbox" class="hidden" style="position:fixed;inset:0;background:rgba(12,10,8,0.92);z-index:50;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));padding-bottom:calc(24px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;">
+    <button id="btnCerrarLightbox" style="position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;background:rgba(255,255,255,0.15);color:#fff;border:none;width:40px;height:40px;border-radius:50%;font-size:20px;line-height:1;">✕</button>
+    <img id="lightboxImg" style="display:block;max-width:100%;max-height:100%;margin:0 auto;border-radius:8px;object-fit:contain;">
+  </div>
 
   <!-- Detalle solo lectura (Recetario) -->
   <div id="vistaDetalle" class="hidden">
@@ -355,6 +360,19 @@ function elegirReceta(id) {
   window.scrollTo({ top: 0 });
 }
 
+// ---- LIGHTBOX (ver foto en grande) ----
+function abrirLightbox(url) {
+  document.getElementById("lightboxImg").src = url;
+  document.getElementById("lightbox").classList.remove("hidden");
+}
+function cerrarLightbox() {
+  document.getElementById("lightbox").classList.add("hidden");
+  document.getElementById("lightboxImg").src = "";
+}
+document.getElementById("lightbox").addEventListener("click", cerrarLightbox);
+document.getElementById("btnCerrarLightbox").addEventListener("click", (e) => { e.stopPropagation(); cerrarLightbox(); });
+document.getElementById("lightboxImg").addEventListener("click", (e) => e.stopPropagation());
+
 // ---- RECETARIO (solo lectura) ----
 function abrirDetalle() {
   document.getElementById("vistaDetalle").classList.remove("hidden");
@@ -364,7 +382,8 @@ function abrirDetalle() {
   const detFotos = document.getElementById("detFotos");
   const fotos = (RECETA_ACTIVA.fotos && RECETA_ACTIVA.fotos.length) ? RECETA_ACTIVA.fotos.map(f => f.url) : (RECETA_ACTIVA.foto_url ? [RECETA_ACTIVA.foto_url] : []);
   if (fotos.length) {
-    detFotos.innerHTML = fotos.map(url => `<img src="${url}" style="width:100%;border-radius:var(--radius);object-fit:cover;height:160px;grid-column:${fotos.length === 1 ? '1 / -1' : 'auto'};">`).join("");
+    detFotos.innerHTML = fotos.map(url => `<img src="${url}" data-url="${url}" style="width:100%;border-radius:var(--radius);object-fit:cover;height:160px;cursor:pointer;grid-column:${fotos.length === 1 ? '1 / -1' : 'auto'};">`).join("");
+    detFotos.querySelectorAll("img").forEach(img => img.addEventListener("click", () => abrirLightbox(img.dataset.url)));
     detFotos.classList.remove("hidden");
   } else { detFotos.classList.add("hidden"); }
   document.getElementById("listaIngredientes").innerHTML = RECETA_ACTIVA.ingredientes.map(i => `
@@ -428,7 +447,7 @@ function renderCarrito() {
       <span>${it.nombre} <span style="color:var(--ink-soft);">(${it.area})</span></span>
       <span style="display:flex;align-items:center;gap:10px;">
         <strong>${fmtCantidad(it.cantidadDeseada)} ${it.rendimiento_unidad}</strong>
-        <button data-i="${i}" class="btnQuitarCarrito" style="border:none;background:none;color:var(--danger);font-size:17px;cursor:pointer;padding:0;">✕</button>
+        <button data-i="${i}" class="btnQuitarCarrito" style="border:none;background:none;color:var(--danger);font-size:17px;cursor:pointer;padding:10px;margin:-10px;">✕</button>
       </span>
     </div>`).join("") || '<p class="rinde">Lista vacía.</p>';
   document.querySelectorAll(".btnQuitarCarrito").forEach(b => b.addEventListener("click", (e) => {
