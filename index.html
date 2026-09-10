@@ -128,7 +128,7 @@
     <div class="cat" id="detCategoria"></div>
     <h2 id="detNombre" style="margin:2px 0 4px;"></h2>
     <div class="rinde" id="detRinde"></div>
-    <img id="detFoto" class="hidden" style="width:100%;border-radius:var(--radius);margin:10px 0;object-fit:cover;max-height:220px;">
+    <div id="detFotos" class="hidden" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0;"></div>
 
     <div class="section-title">Ingredientes (receta base)</div>
     <div class="card" id="listaIngredientes"></div>
@@ -275,11 +275,12 @@ document.getElementById("btnVaciarCarrito").addEventListener("click", () => {
 });
 
 async function cargarRecetas() {
-  const [recetas, ingredientes] = await Promise.all([
+  const [recetas, ingredientes, fotos] = await Promise.all([
     fetch(`${SUPABASE_URL}/rest/v1/recetas?negocio=eq.turquesa&activo=eq.true&select=id,nombre,area,categoria,rendimiento_cantidad,rendimiento_unidad,pasos,notas,foto_url&order=area,categoria,nombre`, { headers: H }).then(r => r.json()),
-    fetch(`${SUPABASE_URL}/rest/v1/receta_ingredientes?select=receta_id,producto_nombre,cantidad,unidad,orden&order=orden`, { headers: H }).then(r => r.json())
+    fetch(`${SUPABASE_URL}/rest/v1/receta_ingredientes?select=receta_id,producto_nombre,cantidad,unidad,orden&order=orden`, { headers: H }).then(r => r.json()),
+    fetch(`${SUPABASE_URL}/rest/v1/receta_fotos?select=receta_id,url,orden&order=orden`, { headers: H }).then(r => r.json())
   ]);
-  RECETAS = recetas.map(r => ({ ...r, ingredientes: ingredientes.filter(i => i.receta_id === r.id) }));
+  RECETAS = recetas.map(r => ({ ...r, ingredientes: ingredientes.filter(i => i.receta_id === r.id), fotos: fotos.filter(f => f.receta_id === r.id) }));
 }
 
 function renderAreas() {
@@ -360,8 +361,12 @@ function abrirDetalle() {
   document.getElementById("detCategoria").textContent = RECETA_ACTIVA.area + (RECETA_ACTIVA.categoria ? " · " + RECETA_ACTIVA.categoria : "");
   document.getElementById("detNombre").textContent = RECETA_ACTIVA.nombre;
   document.getElementById("detRinde").textContent = `Rinde ${RECETA_ACTIVA.rendimiento_cantidad} ${RECETA_ACTIVA.rendimiento_unidad}`;
-  const detFoto = document.getElementById("detFoto");
-  if (RECETA_ACTIVA.foto_url) { detFoto.src = RECETA_ACTIVA.foto_url; detFoto.classList.remove("hidden"); } else { detFoto.classList.add("hidden"); }
+  const detFotos = document.getElementById("detFotos");
+  const fotos = (RECETA_ACTIVA.fotos && RECETA_ACTIVA.fotos.length) ? RECETA_ACTIVA.fotos.map(f => f.url) : (RECETA_ACTIVA.foto_url ? [RECETA_ACTIVA.foto_url] : []);
+  if (fotos.length) {
+    detFotos.innerHTML = fotos.map(url => `<img src="${url}" style="width:100%;border-radius:var(--radius);object-fit:cover;height:160px;grid-column:${fotos.length === 1 ? '1 / -1' : 'auto'};">`).join("");
+    detFotos.classList.remove("hidden");
+  } else { detFotos.classList.add("hidden"); }
   document.getElementById("listaIngredientes").innerHTML = RECETA_ACTIVA.ingredientes.map(i => `
     <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${i.cantidad} ${i.unidad}</strong></div>
   `).join("") || '<p class="rinde">Sin ingredientes cargados.</p>';
