@@ -140,6 +140,12 @@
 
     <div class="section-title">Preparación</div>
     <div class="card" id="listaPasos"></div>
+
+    <div id="seccionMontaje" class="hidden">
+      <div class="section-title">Montaje</div>
+      <div class="card" id="listaMontaje"></div>
+      <div id="montajeFotos" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;"></div>
+    </div>
   </div>
 
   <!-- Calculadora -->
@@ -281,7 +287,7 @@ document.getElementById("btnVaciarCarrito").addEventListener("click", () => {
 
 async function cargarRecetas() {
   const [recetas, ingredientes, fotos] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/recetas?negocio=eq.turquesa&activo=eq.true&select=id,nombre,area,categoria,rendimiento_cantidad,rendimiento_unidad,pasos,notas,foto_url&order=area,categoria,nombre`, { headers: H }).then(r => r.json()),
+    fetch(`${SUPABASE_URL}/rest/v1/recetas?negocio=eq.turquesa&activo=eq.true&select=id,nombre,area,categoria,rendimiento_cantidad,rendimiento_unidad,pasos,pasos_fotos,montaje,montaje_fotos,notas,foto_url&order=area,categoria,nombre`, { headers: H }).then(r => r.json()),
     fetch(`${SUPABASE_URL}/rest/v1/receta_ingredientes?select=receta_id,producto_nombre,cantidad,unidad,orden&order=orden`, { headers: H }).then(r => r.json()),
     fetch(`${SUPABASE_URL}/rest/v1/receta_fotos?select=receta_id,url,orden&order=orden`, { headers: H }).then(r => r.json())
   ]);
@@ -389,9 +395,30 @@ function abrirDetalle() {
   document.getElementById("listaIngredientes").innerHTML = RECETA_ACTIVA.ingredientes.map(i => `
     <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${i.cantidad} ${i.unidad}</strong></div>
   `).join("") || '<p class="rinde">Sin ingredientes cargados.</p>';
-  document.getElementById("listaPasos").innerHTML = (RECETA_ACTIVA.pasos || []).map((p, i) => `
-    <div class="paso-row"><div class="paso-num">${i+1}</div><div>${p}</div></div>
+  const fotosDePaso = (i) => {
+    const f = (RECETA_ACTIVA.pasos_fotos || [])[i];
+    return Array.isArray(f) ? f.filter(Boolean) : (typeof f === "string" && f ? [f] : []);
+  };
+  const miniaturas = (urls) => urls.length
+    ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;margin-top:8px;">${urls.map(u => `<img src="${u}" data-url="${u}" loading="lazy" style="width:100%;height:90px;object-fit:cover;border-radius:8px;cursor:pointer;">`).join("")}</div>`
+    : "";
+  const listaPasos = document.getElementById("listaPasos");
+  listaPasos.innerHTML = (RECETA_ACTIVA.pasos || []).map((p, i) => `
+    <div class="paso-row"><div class="paso-num">${i+1}</div><div style="min-width:0;flex:1;">${p}${miniaturas(fotosDePaso(i))}</div></div>
   `).join("") + (RECETA_ACTIVA.notas ? `<div class="paso-row"><div class="paso-num">⚠️</div><div style="color:var(--ink-soft);">${RECETA_ACTIVA.notas}</div></div>` : "");
+
+  const montaje = RECETA_ACTIVA.montaje || [];
+  const montajeFotos = (RECETA_ACTIVA.montaje_fotos || []).filter(Boolean);
+  const seccionMontaje = document.getElementById("seccionMontaje");
+  if (montaje.length || montajeFotos.length) {
+    document.getElementById("listaMontaje").innerHTML = montaje.map((p, i) => `
+      <div class="paso-row"><div class="paso-num">${i+1}</div><div>${p}</div></div>
+    `).join("") || '<p class="rinde">Mira las fotos de referencia.</p>';
+    document.getElementById("montajeFotos").innerHTML = montajeFotos.map(u => `<img src="${u}" data-url="${u}" loading="lazy" style="width:100%;height:160px;object-fit:cover;border-radius:var(--radius);cursor:pointer;grid-column:${montajeFotos.length === 1 ? '1 / -1' : 'auto'};">`).join("");
+    seccionMontaje.classList.remove("hidden");
+  } else { seccionMontaje.classList.add("hidden"); }
+
+  document.querySelectorAll("#listaPasos img, #montajeFotos img").forEach(img => img.addEventListener("click", () => abrirLightbox(img.dataset.url)));
 }
 
 // ---- CALCULADORA ----
