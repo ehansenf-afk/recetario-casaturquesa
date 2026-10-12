@@ -170,6 +170,7 @@
   <!-- Lista de recetas (usada por Recetario dentro de un área, y por Calculadora/Producción con todas) -->
   <div id="vistaLista" class="hidden">
     <button class="back" id="btnVolverLista">← Volver</button>
+    <div id="areaGuia" class="hidden"></div>
     <input type="text" id="buscar" placeholder="🔍 Buscar receta o ingrediente...">
     <div id="listaRecetas"><p class="rinde">Cargando...</p></div>
   </div>
@@ -282,6 +283,7 @@ const AREAS = [
   { nombre: "Pizza", emoji: "🍕" },
   { nombre: "Sandwich", emoji: "🥪" },
   { nombre: "Ensaladas", emoji: "🥗" },
+  { nombre: "Empanadas", emoji: "🥟" },
 ];
 
 function fmtCantidad(n) { return Number(n.toFixed(2)).toString(); }
@@ -377,7 +379,19 @@ async function cargarCocineros() {
   sel.innerHTML = '<option value="">-- ¿Quién la hizo? --</option>' + COCINEROS.map(c => `<option value="${(c.nombre + ' ' + (c.apellido||'')).trim()}">${c.nombre} ${c.apellido||''}</option>`).join("") + '<option value="__otro__">Otra persona...</option>';
 }
 
+const GUIAS_AREA = {
+  "Empanadas": { titulo: "Guía de doblez", desc: "Las 8 empanadas de horno: cómo debe quedar cada una", url: "https://udsvumfwczyormmprizm.supabase.co/storage/v1/object/public/recetas/empanadas/guia_doblez_8_empanadas_de_horno.webp" }
+};
+function renderGuiaArea() {
+  const el = document.getElementById("areaGuia");
+  const g = MODO === "recetario" ? GUIAS_AREA[AREA_ACTIVA] : null;
+  if (!g) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="modo-card modo-destacado" style="padding:12px 14px;margin-bottom:12px;gap:12px;"><img src="${g.url}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:10px;flex-shrink:0;"><div><div class="modo-nombre" style="font-size:16px;">📐 ${g.titulo}</div><div class="modo-desc">${g.desc}</div></div></div>`;
+  el.firstElementChild.addEventListener("click", () => abrirLightbox(g.url));
+  el.classList.remove("hidden");
+}
 function renderLista() {
+  renderGuiaArea();
   const q = (document.getElementById("buscar").value || "").trim().toLowerCase();
   const wrap = document.getElementById("listaRecetas");
   const base = MODO === "recetario" ? RECETAS.filter(r => r.area === AREA_ACTIVA) : RECETAS;
