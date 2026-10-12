@@ -409,7 +409,7 @@ function renderLista() {
   const grupos = {};
   filtradas.forEach(r => { (grupos[agruparPor(r)] ||= []).push(r); });
   wrap.innerHTML = Object.entries(grupos).map(([g, items]) => {
-    const expandido = q.length > 0 || GRUPOS_EXPANDIDOS.has(g);
+    const expandido = q.length > 0 || GRUPOS_EXPANDIDOS.has(g) || Object.keys(grupos).length === 1;
     return `
     <div class="section-title section-title-toggle" data-grupo="${g}">
       <span class="toggle-arrow">${expandido ? "▾" : "▸"}</span>${g} <span style="font-weight:400;">(${items.length})</span>
