@@ -999,7 +999,17 @@ setInterval(() => {
   refrescarEquipoActivo();
 }, 30000);
 
-cargarRecetas();
+const recetasListas = cargarRecetas();
+recetasListas.then(() => {
+  const areaParam = (new URLSearchParams(location.search).get("area") || "").toLowerCase();
+  const area = AREAS.find(x => x.nombre.toLowerCase() === areaParam);
+  if (!area) return;
+  MODO = "recetario"; AREA_ACTIVA = area.nombre; GRUPOS_EXPANDIDOS.clear();
+  ocultarTodo(); document.getElementById("vistaLista").classList.remove("hidden");
+  document.getElementById("buscar").value = "";
+  document.getElementById("headerEyebrow").textContent = "Casa Turquesa · " + area.nombre;
+  renderLista(); renderCarritoBar();
+});
 cargarCocineros().then(() => { if (vistaActiva() === "vistaEquipo") renderQuien(); });
 cargarEquipos().then(() => {
   const slug = new URLSearchParams(location.search).get("equipo");
