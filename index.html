@@ -76,6 +76,53 @@
       <div class="modo-emoji">🍽️</div>
       <div><div class="modo-nombre">Menú de almuerzo</div><div class="modo-desc">Ver la semana y cargar entradas/menús por día</div></div>
     </div>
+    <div class="modo-card hidden" id="btnAbrirEquipos">
+      <div class="modo-emoji">🧊</div>
+      <div><div class="modo-nombre">Refrigeradores</div><div class="modo-desc">Qué hay en cada refrigerador y congelador</div></div>
+    </div>
+  </div>
+
+  <!-- Lista de equipos de frío -->
+  <div id="vistaEquipos" class="hidden">
+    <button class="back" id="btnVolverEquipos">← Inicio</button>
+    <h2 style="margin:2px 0 4px;">🧊 Refrigeradores y congeladores</h2>
+    <div class="rinde" style="margin-bottom:14px;">Toca un equipo para ver qué hay y anotar lo que entra o sale.</div>
+    <div id="listaEquipos"></div>
+  </div>
+
+  <!-- Un equipo de frío -->
+  <div id="vistaEquipo" class="hidden">
+    <button class="back" id="btnVolverEquipo">← Equipos</button>
+    <div class="cat" id="eqTipo"></div>
+    <h2 id="eqNombre" style="margin:2px 0 10px;"></h2>
+    <div class="card" style="padding:10px 12px;">
+      <div class="rinde" style="margin-bottom:6px;">¿Quién eres?</div>
+      <select id="eqQuien" style="margin-bottom:0;"></select>
+      <input type="text" id="eqQuienOtro" class="hidden" placeholder="Tu nombre" style="margin:8px 0 0;">
+    </div>
+    <p class="msg" id="eqMsg"></p>
+    <div class="section-title">Lo que hay ahora</div>
+    <div id="eqItems"></div>
+    <div id="eqAgotadosWrap" class="hidden">
+      <div class="section-title section-title-toggle" id="eqAgotadosToggle"><span class="toggle-arrow">▸</span>Sin stock</div>
+      <div id="eqAgotados" class="hidden"></div>
+    </div>
+
+    <div class="section-title">Agregar producto</div>
+    <div class="card">
+      <input type="text" id="eqNuevoProducto" list="eqSugerencias" placeholder="Producto (ej. Pastel de choclo)" autocomplete="off">
+      <datalist id="eqSugerencias"></datalist>
+      <div style="display:flex;gap:8px;">
+        <input type="number" id="eqNuevoCantidad" min="0.1" step="any" placeholder="Cantidad" style="flex:1;">
+        <input type="text" id="eqNuevoUnidad" list="eqUnidades" value="porciones" style="flex:1;">
+        <datalist id="eqUnidades"><option value="porciones"><option value="unidades"><option value="bandejas"><option value="bolsas"><option value="kg"><option value="litros"></datalist>
+      </div>
+      <input type="text" id="eqNuevoNota" placeholder="Nota (opcional, ej. hecho el sábado)">
+      <button class="btn-primary" id="btnEqAgregar">Agregar al equipo</button>
+    </div>
+
+    <div class="section-title">Movimientos recientes</div>
+    <div class="card" id="eqMovs"></div>
   </div>
 
   <!-- Calendario semanal del menú -->
@@ -231,7 +278,7 @@ const AREAS = [
 ];
 
 function fmtCantidad(n) { return Number(n.toFixed(2)).toString(); }
-const VISTAS = ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito","vistaMenuCalendario","vistaMenuDiario"];
+const VISTAS = ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito","vistaMenuCalendario","vistaMenuDiario","vistaEquipos","vistaEquipo"];
 function ocultarTodo() {
   VISTAS.forEach(id => document.getElementById(id).classList.add("hidden"));
 }
@@ -258,7 +305,7 @@ function irAHome() {
   renderCarritoBar();
   window.scrollTo({ top: 0 });
 }
-document.querySelectorAll(".modo-card").forEach(el => {
+document.querySelectorAll(".modo-card[data-modo]").forEach(el => {
   el.addEventListener("click", () => {
     MODO = el.dataset.modo;
     GRUPOS_EXPANDIDOS.clear();
@@ -675,8 +722,257 @@ document.getElementById("btnEnviarMenuDiario").addEventListener("click", async (
   }
 });
 
+// ---- REFRIGERADORES Y CONGELADORES ----
+let EQUIPOS = [];
+let EQUIPO_ACTIVO = null;
+let EQ_MOVS = [];
+let EQ_ABIERTO = null; // { itemId, accion: "entrada" | "salida" | "ajuste" }
+let EQ_AGOTADOS_ABIERTO = false;
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmtNum = (n) => Number(Number(n).toFixed(2)).toString();
+function fmtFechaHora(iso) {
+  return new Date(iso).toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Santiago" });
+}
+function eqMsg(texto, esError) {
+  const el = document.getElementById("eqMsg");
+  el.style.color = esError ? "var(--danger)" : "var(--accent)";
+  el.textContent = texto || "";
+}
+function nombreCorto(c) {
+  return `${(c.nombre || "").split(" ")[0]} ${(c.apellido || "").split(" ")[0]}`.trim();
+}
+
+async function cargarEquipos() {
+  try {
+    const [eqs, stock] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/equipos_frio?negocio=eq.turquesa&activo=eq.true&select=id,nombre,tipo,slug&order=orden,nombre`, { headers: H }).then(r => r.json()),
+      fetch(`${SUPABASE_URL}/rest/v1/equipo_stock?select=id,equipo_id,producto,unidad,cantidad,updated_at,updated_by&order=producto`, { headers: H }).then(r => r.json())
+    ]);
+    if (!Array.isArray(eqs) || !Array.isArray(stock)) throw new Error("respuesta inválida");
+    EQUIPOS = eqs.map(e => ({ ...e, items: stock.filter(s => s.equipo_id === e.id) }));
+  } catch (e) { EQUIPOS = []; }
+  document.getElementById("btnAbrirEquipos").classList.toggle("hidden", EQUIPOS.length === 0);
+}
+
+function emojiEquipo(tipo) { return tipo === "congelador" ? "🧊" : "❄️"; }
+
+function renderListaEquipos() {
+  const wrap = document.getElementById("listaEquipos");
+  if (!EQUIPOS.length) { wrap.innerHTML = '<p class="rinde">Todavía no hay equipos cargados.</p>'; return; }
+  wrap.innerHTML = EQUIPOS.map(e => {
+    const conStock = e.items.filter(i => Number(i.cantidad) > 0);
+    const ultima = e.items.reduce((m, i) => (!m || i.updated_at > m ? i.updated_at : m), null);
+    return `<div class="area-card" data-equipo="${esc(e.id)}">
+      <div class="area-emoji">${emojiEquipo(e.tipo)}</div>
+      <div><div class="area-nombre">${esc(e.nombre)}</div>
+      <div class="area-count">${conStock.length} producto${conStock.length === 1 ? "" : "s"}${ultima ? " · actualizado " + fmtFechaHora(ultima) : ""}</div></div>
+    </div>`;
+  }).join("");
+  wrap.querySelectorAll(".area-card").forEach(el => el.addEventListener("click", () => abrirEquipo(el.dataset.equipo)));
+}
+
+function abrirListaEquipos() {
+  ocultarTodo();
+  document.getElementById("vistaEquipos").classList.remove("hidden");
+  renderListaEquipos();
+  renderCarritoBar();
+  window.scrollTo({ top: 0 });
+  cargarEquipos().then(renderListaEquipos);
+}
+
+function renderQuien() {
+  const sel = document.getElementById("eqQuien");
+  const guardado = (() => { try { return localStorage.getItem("eq_quien") || ""; } catch (e) { return ""; } })();
+  const nombres = COCINEROS.map(nombreCorto).filter(Boolean);
+  const actual = sel.value || guardado;
+  sel.innerHTML = '<option value="">-- Elige quién eres --</option>' +
+    nombres.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("") +
+    '<option value="__otro__">Otra persona…</option>';
+  if (actual && (nombres.includes(actual) || actual === "__otro__")) sel.value = actual;
+  document.getElementById("eqQuienOtro").classList.toggle("hidden", sel.value !== "__otro__");
+}
+function quienActual() {
+  const sel = document.getElementById("eqQuien");
+  if (sel.value === "__otro__") return document.getElementById("eqQuienOtro").value.trim();
+  return sel.value;
+}
+document.getElementById("eqQuien").addEventListener("change", (e) => {
+  try { localStorage.setItem("eq_quien", e.target.value); } catch (err) {}
+  document.getElementById("eqQuienOtro").classList.toggle("hidden", e.target.value !== "__otro__");
+});
+
+function renderItemEquipo(it) {
+  const abierto = EQ_ABIERTO && EQ_ABIERTO.itemId === it.id ? EQ_ABIERTO.accion : null;
+  const titulos = { entrada: "¿Cuántas agregaste?", salida: "¿Cuántas sacaste?", ajuste: "¿Cuántas hay en total ahora?" };
+  const panel = abierto ? `
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);">
+      <div class="rinde" style="margin-bottom:6px;">${titulos[abierto]}</div>
+      <div style="display:flex;gap:8px;">
+        <input type="number" class="eqPanelCant" min="0" step="any" value="${abierto === "ajuste" ? fmtNum(it.cantidad) : 1}" style="flex:1;margin:0;">
+        <input type="text" class="eqPanelNota" placeholder="Nota (opcional)" style="flex:2;margin:0;">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn-primary" data-act="confirmar" data-id="${esc(it.id)}">Guardar</button>
+        <button class="btn-secondary" data-act="cancelar">Cancelar</button>
+      </div>
+    </div>` : "";
+  return `<div class="card" data-item="${esc(it.id)}">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="flex:1;min-width:0;">
+        <div class="nombre" style="word-break:break-word;">${esc(it.producto)}</div>
+        <div class="rinde">${it.updated_at ? fmtFechaHora(it.updated_at) : ""}${it.updated_by ? " · " + esc(it.updated_by) : ""}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:26px;font-weight:700;line-height:1;">${fmtNum(it.cantidad)}</div>
+        <div class="rinde">${esc(it.unidad)}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="btn-secondary" data-act="salida" data-id="${esc(it.id)}">− Saqué</button>
+      <button class="btn-primary" data-act="entrada" data-id="${esc(it.id)}">+ Agregué</button>
+    </div>
+    <div style="margin-top:8px;"><button class="back" style="margin:0;padding:6px 0;font-size:12.5px;color:var(--ink-soft);" data-act="ajuste" data-id="${esc(it.id)}">Corregir cantidad</button></div>
+    ${panel}
+  </div>`;
+}
+
+function renderEquipo() {
+  const e = EQUIPO_ACTIVO;
+  document.getElementById("eqTipo").textContent = e.tipo === "congelador" ? "Congelador" : "Refrigerador";
+  document.getElementById("eqNombre").textContent = e.nombre;
+  renderQuien();
+
+  const conStock = e.items.filter(i => Number(i.cantidad) > 0).sort((a, b) => a.producto.localeCompare(b.producto, "es"));
+  const agotados = e.items.filter(i => Number(i.cantidad) <= 0).sort((a, b) => a.producto.localeCompare(b.producto, "es"));
+  document.getElementById("eqItems").innerHTML = conStock.map(renderItemEquipo).join("") || '<p class="rinde">No hay nada anotado en este equipo.</p>';
+  document.getElementById("eqAgotadosWrap").classList.toggle("hidden", agotados.length === 0);
+  document.querySelector("#eqAgotadosToggle .toggle-arrow").textContent = EQ_AGOTADOS_ABIERTO ? "▾" : "▸";
+  const wrapAg = document.getElementById("eqAgotados");
+  wrapAg.classList.toggle("hidden", !EQ_AGOTADOS_ABIERTO);
+  wrapAg.innerHTML = agotados.map(renderItemEquipo).join("");
+
+  const nombres = new Set();
+  EQUIPOS.forEach(x => x.items.forEach(i => nombres.add(i.producto)));
+  RECETAS.forEach(r => nombres.add(r.nombre));
+  document.getElementById("eqSugerencias").innerHTML = [...nombres].sort((a, b) => a.localeCompare(b, "es")).map(n => `<option value="${esc(n)}">`).join("");
+
+  const verbo = { entrada: "agregó", salida: "sacó", ajuste: "corrigió a" };
+  document.getElementById("eqMovs").innerHTML = EQ_MOVS.map(m => {
+    const cant = m.tipo === "ajuste" ? fmtNum(m.saldo) : fmtNum(Math.abs(m.delta));
+    return `<div class="prod-item"><strong style="color:var(--ink);">${fmtFechaHora(m.fecha)}</strong> · ${esc(m.realizado_por)} ${verbo[m.tipo]} ${cant} ${esc(m.unidad)} de ${esc(m.producto)} <span style="color:var(--ink-soft);">(quedan ${fmtNum(m.saldo)})</span>${m.nota ? "<br>" + esc(m.nota) : ""}</div>`;
+  }).join("") || '<p class="rinde">Sin movimientos todavía.</p>';
+}
+
+async function refrescarEquipoActivo() {
+  if (!EQUIPO_ACTIVO) return;
+  await cargarEquipos();
+  const e = EQUIPOS.find(x => x.id === EQUIPO_ACTIVO.id);
+  if (!e) return;
+  EQUIPO_ACTIVO = e;
+  try {
+    const movs = await fetch(`${SUPABASE_URL}/rest/v1/equipo_movimientos?equipo_id=eq.${e.id}&select=producto,unidad,tipo,delta,saldo,realizado_por,nota,fecha&order=fecha.desc&limit=30`, { headers: H }).then(r => r.json());
+    EQ_MOVS = Array.isArray(movs) ? movs : [];
+  } catch (err) { EQ_MOVS = []; }
+  if (vistaActiva() === "vistaEquipo") renderEquipo();
+}
+
+function abrirEquipo(id) {
+  const e = EQUIPOS.find(x => x.id === id);
+  if (!e) return;
+  EQUIPO_ACTIVO = e;
+  EQ_MOVS = [];
+  EQ_ABIERTO = null;
+  ocultarTodo();
+  document.getElementById("vistaEquipo").classList.remove("hidden");
+  eqMsg("");
+  renderEquipo();
+  renderCarritoBar();
+  window.scrollTo({ top: 0 });
+  refrescarEquipoActivo();
+}
+
+async function eqRegistrar({ producto, unidad, tipo, cantidad, nota }) {
+  const quien = quienActual();
+  if (!quien) { eqMsg("Elige quién eres antes de anotar.", true); window.scrollTo({ top: 0 }); return false; }
+  if (!producto || !(cantidad >= 0) || (tipo !== "ajuste" && !(cantidad > 0))) { eqMsg("Revisa el producto y la cantidad.", true); return false; }
+  eqMsg("Guardando...", false);
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/registrar_movimiento_equipo`, {
+      method: "POST", headers: HJ,
+      body: JSON.stringify({ p_equipo_id: EQUIPO_ACTIVO.id, p_producto: producto, p_unidad: unidad || "porciones", p_tipo: tipo, p_cantidad: cantidad, p_realizado_por: quien, p_nota: nota || null })
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) { eqMsg((j && j.message) || "No se pudo guardar.", true); return false; }
+    eqMsg("✅ Guardado", false);
+    EQ_ABIERTO = null;
+    await refrescarEquipoActivo();
+    return true;
+  } catch (err) { eqMsg("Sin conexión, no se guardó. Intenta de nuevo.", true); return false; }
+}
+
+function manejarClicEquipo(e) {
+  const btn = e.target.closest("[data-act]");
+  if (!btn) return;
+  const act = btn.dataset.act;
+  if (act === "cancelar") { EQ_ABIERTO = null; renderEquipo(); return; }
+  if (act === "entrada" || act === "salida" || act === "ajuste") {
+    EQ_ABIERTO = { itemId: btn.dataset.id, accion: act };
+    eqMsg("");
+    renderEquipo();
+    const inp = document.querySelector(".eqPanelCant");
+    if (inp) { inp.focus(); inp.select(); }
+    return;
+  }
+  if (act === "confirmar") {
+    const it = EQUIPO_ACTIVO.items.find(x => x.id === btn.dataset.id);
+    const card = btn.closest(".card");
+    if (!it || !EQ_ABIERTO) return;
+    eqRegistrar({
+      producto: it.producto, unidad: it.unidad, tipo: EQ_ABIERTO.accion,
+      cantidad: Number(card.querySelector(".eqPanelCant").value),
+      nota: card.querySelector(".eqPanelNota").value.trim()
+    });
+  }
+}
+document.getElementById("eqItems").addEventListener("click", manejarClicEquipo);
+document.getElementById("eqAgotados").addEventListener("click", manejarClicEquipo);
+document.getElementById("eqAgotadosToggle").addEventListener("click", () => { EQ_AGOTADOS_ABIERTO = !EQ_AGOTADOS_ABIERTO; renderEquipo(); });
+
+document.getElementById("btnEqAgregar").addEventListener("click", async () => {
+  const ok = await eqRegistrar({
+    producto: document.getElementById("eqNuevoProducto").value.trim(),
+    unidad: document.getElementById("eqNuevoUnidad").value.trim(),
+    tipo: "entrada",
+    cantidad: Number(document.getElementById("eqNuevoCantidad").value),
+    nota: document.getElementById("eqNuevoNota").value.trim()
+  });
+  if (ok) {
+    document.getElementById("eqNuevoProducto").value = "";
+    document.getElementById("eqNuevoCantidad").value = "";
+    document.getElementById("eqNuevoNota").value = "";
+  }
+});
+
+document.getElementById("btnAbrirEquipos").addEventListener("click", abrirListaEquipos);
+document.getElementById("btnVolverEquipos").addEventListener("click", irAHome);
+document.getElementById("btnVolverEquipo").addEventListener("click", abrirListaEquipos);
+
+setInterval(() => {
+  if (document.hidden || vistaActiva() !== "vistaEquipo" || EQ_ABIERTO) return;
+  const a = document.activeElement;
+  if (a && a.closest && a.closest("#vistaEquipo") && /INPUT|SELECT|TEXTAREA/.test(a.tagName)) return;
+  refrescarEquipoActivo();
+}, 30000);
+
 cargarRecetas();
-cargarCocineros();
+cargarCocineros().then(() => { if (vistaActiva() === "vistaEquipo") renderQuien(); });
+cargarEquipos().then(() => {
+  const slug = new URLSearchParams(location.search).get("equipo");
+  if (!slug) return;
+  const e = EQUIPOS.find(x => x.slug === slug);
+  if (e) abrirEquipo(e.id);
+});
 if (new URLSearchParams(location.search).get("menu")) abrirMenuDiario();
 </script>
 </body>
