@@ -25,6 +25,9 @@
   .area-card { display:flex; align-items:center; gap:14px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:18px 16px; margin-bottom:12px; cursor:pointer; }
   .area-card:active { opacity:0.7; }
   .area-emoji { font-size:28px; }
+  .eq-thumb { width:64px; height:48px; object-fit:cover; border-radius:8px; border:1px solid var(--line); flex:none; }
+  .eq-estacion { font-size:12px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; margin:16px 0 8px; }
+  .eq-foto { width:100%; max-height:260px; object-fit:cover; border-radius:var(--radius); border:1px solid var(--line); margin:0 0 12px; display:block; }
   .area-nombre { font-size:16px; font-weight:700; }
   .area-count { font-size:12px; color:var(--ink-soft); margin-top:2px; }
   main { padding:16px; max-width:640px; margin:0 auto; padding-bottom:80px; }
@@ -106,6 +109,7 @@
     <button class="back" id="btnVolverEquipo">← Equipos</button>
     <div class="cat" id="eqTipo"></div>
     <h2 id="eqNombre" style="margin:2px 0 10px;"></h2>
+    <img id="eqFoto" class="eq-foto hidden" alt="">
     <div class="card" style="padding:10px 12px;">
       <div class="rinde" style="margin-bottom:6px;">¿Quién eres?</div>
       <select id="eqQuien" style="margin-bottom:0;"></select>
@@ -780,7 +784,7 @@ function nombreCorto(c) {
 async function cargarEquipos() {
   try {
     const [eqs, stock] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/equipos_frio?negocio=eq.turquesa&activo=eq.true&select=id,nombre,tipo,slug&order=orden,nombre`, { headers: H }).then(r => r.json()),
+      fetch(`${SUPABASE_URL}/rest/v1/equipos_frio?negocio=eq.turquesa&activo=eq.true&select=id,nombre,tipo,slug,estacion,foto_url&order=orden,nombre`, { headers: H }).then(r => r.json()),
       fetch(`${SUPABASE_URL}/rest/v1/equipo_stock?select=id,equipo_id,producto,unidad,cantidad,updated_at,updated_by&order=producto`, { headers: H }).then(r => r.json())
     ]);
     if (!Array.isArray(eqs) || !Array.isArray(stock)) throw new Error("respuesta inválida");
@@ -794,15 +798,18 @@ function emojiEquipo(tipo) { return tipo === "congelador" ? "🧊" : "❄️"; }
 function renderListaEquipos() {
   const wrap = document.getElementById("listaEquipos");
   if (!EQUIPOS.length) { wrap.innerHTML = '<p class="rinde">Todavía no hay equipos cargados.</p>'; return; }
-  wrap.innerHTML = EQUIPOS.map(e => {
+  const tarjeta = (e) => {
     const conStock = e.items.filter(i => Number(i.cantidad) > 0);
     const ultima = e.items.reduce((m, i) => (!m || i.updated_at > m ? i.updated_at : m), null);
+    const visual = e.foto_url ? `<img class="eq-thumb" src="${esc(e.foto_url)}" alt="" loading="lazy">` : `<div class="area-emoji">${emojiEquipo(e.tipo)}</div>`;
     return `<div class="area-card" data-equipo="${esc(e.id)}">
-      <div class="area-emoji">${emojiEquipo(e.tipo)}</div>
-      <div><div class="area-nombre">${esc(e.nombre)}</div>
+      ${visual}
+      <div><div class="area-nombre">${emojiEquipo(e.tipo)} ${esc(e.nombre)}</div>
       <div class="area-count">${conStock.length} producto${conStock.length === 1 ? "" : "s"}${ultima ? " · actualizado " + fmtFechaHora(ultima) : ""}</div></div>
     </div>`;
-  }).join("");
+  };
+  const estaciones = [...new Set(EQUIPOS.map(e => e.estacion || "Sin estación"))];
+  wrap.innerHTML = estaciones.map(est => `<div class="eq-estacion">${esc(est)}</div>` + EQUIPOS.filter(e => (e.estacion || "Sin estación") === est).map(tarjeta).join("")).join("");
   wrap.querySelectorAll(".area-card").forEach(el => el.addEventListener("click", () => abrirEquipo(el.dataset.equipo)));
 }
 
@@ -873,7 +880,10 @@ function renderItemEquipo(it) {
 
 function renderEquipo() {
   const e = EQUIPO_ACTIVO;
-  document.getElementById("eqTipo").textContent = e.tipo === "congelador" ? "Congelador" : "Refrigerador";
+  document.getElementById("eqTipo").textContent = (e.tipo === "congelador" ? "Congelador" : "Refrigerador") + (e.estacion ? " · " + e.estacion : "");
+  const foto = document.getElementById("eqFoto");
+  foto.classList.toggle("hidden", !e.foto_url);
+  if (e.foto_url) foto.src = e.foto_url;
   document.getElementById("eqNombre").textContent = e.nombre;
   renderQuien();
 
