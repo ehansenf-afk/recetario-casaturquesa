@@ -667,7 +667,8 @@ function renderCampoLista(wrapId, placeholderBase, minimo) {
   const n = wrap.children.length;
   const input = document.createElement("input");
   input.type = "text";
-  input.placeholder = placeholderBase + " " + (n + 1);
+  input.placeholder = placeholderBase + " " + (n + 1) + " (máx. 45 letras)";
+  input.maxLength = 45; // Fudo rechaza nombres de producto de más de 45 letras
   input.className = "campoListaMenu";
   wrap.appendChild(input);
 }
@@ -757,6 +758,8 @@ document.getElementById("btnEnviarMenuDiario").addEventListener("click", async (
   if (!telefono) { msg.style.color = "var(--danger)"; msg.textContent = "Ingresa tu WhatsApp."; return; }
   if (!fecha) { msg.style.color = "var(--danger)"; msg.textContent = "Elige la fecha del menú."; return; }
   if (!menus.length) { msg.style.color = "var(--danger)"; msg.textContent = "Ingresa al menos un menú."; return; }
+  const largo = [...entradas, ...menus].find(t => t.length > 45);
+  if (largo) { msg.style.color = "var(--danger)"; msg.textContent = "Un plato tiene más de 45 letras (" + largo.slice(0, 30) + "...). Acórtalo."; return; }
   msg.style.color = "var(--ink-soft)";
   msg.textContent = "Enviando...";
   try {
