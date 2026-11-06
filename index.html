@@ -359,7 +359,7 @@ document.getElementById("btnVaciarCarrito").addEventListener("click", () => {
 
 async function cargarRecetas() {
   const [recetas, ingredientes, fotos] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/recetas?negocio=eq.turquesa&activo=eq.true&select=id,nombre,area,categoria,rendimiento_cantidad,rendimiento_unidad,pasos,pasos_fotos,montaje,montaje_fotos,notas,foto_url,incompleta,incompleta_motivo&order=area,categoria,nombre`, { headers: H }).then(r => r.json()),
+    fetch(`${SUPABASE_URL}/rest/v1/recetas?negocio=eq.turquesa&activo=eq.true&select=id,nombre,area,categoria,rendimiento_cantidad,rendimiento_unidad,pasos,pasos_fotos,montaje,montaje_fotos,notas,foto_url,incompleta,incompleta_motivo,produccion_minima,produccion_minima_unidad,produccion_minima_nota&order=area,categoria,nombre`, { headers: H }).then(r => r.json()),
     fetch(`${SUPABASE_URL}/rest/v1/receta_ingredientes?select=receta_id,producto_nombre,cantidad,unidad,orden&order=orden`, { headers: H }).then(r => r.json()),
     fetch(`${SUPABASE_URL}/rest/v1/receta_fotos?select=receta_id,url,orden&order=orden`, { headers: H }).then(r => r.json())
   ]);
@@ -481,7 +481,7 @@ function abrirDetalle() {
   const motivosInc = motivosIncompleta(RECETA_ACTIVA);
   avisoInc.classList.toggle("hidden", !motivosInc.length);
   if (motivosInc.length) avisoInc.innerHTML = '<span class="burbuja-roja"></span><b>Receta incompleta:</b> ' + motivosInc.map(x => String(x).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]))).join("; ") + ".";
-  document.getElementById("detRinde").textContent = `Rinde ${RECETA_ACTIVA.rendimiento_cantidad} ${RECETA_ACTIVA.rendimiento_unidad}`;
+  document.getElementById("detRinde").innerHTML = `Rinde ${RECETA_ACTIVA.rendimiento_cantidad} ${RECETA_ACTIVA.rendimiento_unidad}` + minimaHtml(RECETA_ACTIVA);
   const detFotos = document.getElementById("detFotos");
   const fotos = (RECETA_ACTIVA.fotos && RECETA_ACTIVA.fotos.length) ? RECETA_ACTIVA.fotos.map(f => f.url) : (RECETA_ACTIVA.foto_url ? [RECETA_ACTIVA.foto_url] : []);
   if (fotos.length) {
@@ -537,11 +537,16 @@ function renderCalculadora() {
     <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${fmtCantidad(Number(i.cantidad) * f)} ${i.unidad}</strong></div>
   `).join("") || '<p class="rinde">Sin ingredientes cargados.</p>';
 }
+function minimaHtml(r) {
+  if (!r || !r.produccion_minima) return "";
+  const e = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  return '<div style="margin-top:6px;padding:8px 10px;border-radius:10px;background:#fff6dd;color:#5a4300;font-size:13px;"><b>Producción mínima: ' + e(r.produccion_minima) + " " + e(r.produccion_minima_unidad || "") + "</b>" + (r.produccion_minima_nota ? "<br>" + e(r.produccion_minima_nota) : "") + "</div>";
+}
 function abrirCalculadora() {
   document.getElementById("vistaCalculadora").classList.remove("hidden");
   document.getElementById("calcCategoria").textContent = RECETA_ACTIVA.area + (RECETA_ACTIVA.categoria ? " · " + RECETA_ACTIVA.categoria : "");
   document.getElementById("calcNombre").textContent = RECETA_ACTIVA.nombre;
-  document.getElementById("calcRinde").textContent = `Rinde ${RECETA_ACTIVA.rendimiento_cantidad} ${RECETA_ACTIVA.rendimiento_unidad}`;
+  document.getElementById("calcRinde").innerHTML = `Rinde ${RECETA_ACTIVA.rendimiento_cantidad} ${RECETA_ACTIVA.rendimiento_unidad}` + minimaHtml(RECETA_ACTIVA);
   document.getElementById("cantidadDeseada").value = RECETA_ACTIVA.rendimiento_cantidad;
   document.getElementById("unidadDeseada").textContent = RECETA_ACTIVA.rendimiento_unidad;
   renderCalculadora();
