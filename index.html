@@ -302,6 +302,14 @@ const AREAS = [
 ];
 
 function fmtCantidad(n) { return Number(n.toFixed(2)).toString(); }
+const PORCION_G = { "queso de cabra": 60, "jamón artesanal": 90, "jamón": 90, "queso gouda": 90, "queso": 90 };
+function detallePorcion(i, f) {
+  if (!/^porci/i.test(i.unidad || "")) return "";
+  const g = PORCION_G[(i.producto_nombre || "").trim().toLowerCase()];
+  if (!g) return "";
+  const n = Number(i.cantidad) * (f || 1);
+  return ' <span style="color:var(--ink-soft);font-weight:normal;">(1 porción = ' + g + " g" + (n !== 1 ? ", total " + fmtCantidad(n * g) + " g" : "") + ")</span>";
+}
 const VISTAS = ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito","vistaMenuCalendario","vistaMenuDiario","vistaEquipos","vistaEquipo"];
 function ocultarTodo() {
   VISTAS.forEach(id => document.getElementById(id).classList.add("hidden"));
@@ -490,7 +498,7 @@ function abrirDetalle() {
     detFotos.classList.remove("hidden");
   } else { detFotos.classList.add("hidden"); }
   document.getElementById("listaIngredientes").innerHTML = RECETA_ACTIVA.ingredientes.map(i => `
-    <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${i.cantidad} ${i.unidad}</strong></div>
+    <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${i.cantidad} ${i.unidad}${detallePorcion(i, 1)}</strong></div>
   `).join("") || '<p class="rinde">Sin ingredientes cargados.</p>';
   const fotosDePaso = (i) => {
     const f = (RECETA_ACTIVA.pasos_fotos || [])[i];
@@ -534,7 +542,7 @@ function renderCalculadora() {
   document.getElementById("multiplicadorInfo").textContent =
     Math.abs(f - 1) < 0.001 ? "Esto es la receta base." : `Esto es ×${fmtCantidad(f)} la receta base.`;
   document.getElementById("calcIngredientes").innerHTML = RECETA_ACTIVA.ingredientes.map(i => `
-    <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${fmtCantidad(Number(i.cantidad) * f)} ${i.unidad}</strong></div>
+    <div class="ingrediente-row"><span>${i.producto_nombre}</span><strong>${fmtCantidad(Number(i.cantidad) * f)} ${i.unidad}${detallePorcion(i, f)}</strong></div>
   `).join("") || '<p class="rinde">Sin ingredientes cargados.</p>';
 }
 function minimaHtml(r) {
