@@ -60,6 +60,42 @@
   .msg { font-size:13px; text-align:center; margin-top:8px; }
   .prod-item { font-size:12.5px; color:var(--ink-soft); padding:8px 0; border-bottom:1px solid var(--line); }
   .prod-item:last-child { border-bottom:none; }
+
+  /* ---- Inventarios del día (login + conteo por proveedor) ---- */
+  .fcampo label { font-size:12.5px; color:var(--ink-soft); display:block; margin:0 0 4px; font-weight:600; }
+  .fcampo input { width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--paper); color:var(--ink); margin-bottom:12px; font-size:16px; }
+  .chk { display:flex; gap:8px; align-items:flex-start; font-size:13px; color:var(--ink-soft); margin:2px 0 14px; }
+  .chk input { margin-top:2px; width:auto; }
+  .err { color:var(--danger); font-size:13px; min-height:18px; margin:8px 0 0; text-align:center; }
+  .toast { position:fixed; left:50%; bottom:22px; transform:translate(-50%,20px); opacity:0; pointer-events:none; background:#2c2a26; color:#fff; border-radius:12px; padding:10px 16px; font-size:13px; line-height:1.35; z-index:80; max-width:90vw; transition:opacity .2s, transform .2s; }
+  .toast.on { opacity:1; transform:translate(-50%,0); }
+  .toast.mal { background:var(--danger); }
+  .toast b { display:block; font-size:13.5px; }
+  .toast span { opacity:.88; font-size:12px; }
+  .barra-prog { height:8px; background:#ece5d9; border-radius:8px; overflow:hidden; margin:8px 0 4px; }
+  .barra-prog > div { height:100%; background:var(--accent); width:0; transition:width .3s; }
+  .chip { display:inline-block; font-size:11px; font-weight:700; border-radius:20px; padding:2px 8px; background:var(--bg); color:var(--ink-soft); margin-left:6px; vertical-align:middle; }
+  .chip.aviso { background:#fbefd9; color:var(--warn); }
+  .inv-prov { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .inv-prov .flecha { font-size:22px; color:var(--ink-soft); }
+  .inv-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 0 11px 10px; border-bottom:1px solid var(--line); border-left:3px solid transparent; }
+  .inv-row.ok { border-left-color:var(--accent); }
+  .inv-nom { font-size:14.5px; font-weight:600; flex:1; min-width:0; }
+  .stepper { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .stepper button { width:40px; height:40px; border-radius:10px; border:1px solid var(--line); background:var(--paper); font-size:20px; font-weight:700; color:var(--ink); padding:0; }
+  .stepper button:active { background:var(--accent); color:#0c1a17; }
+  .stepper input[type=text] { width:64px; margin:0; padding:9px 4px; text-align:center; font-size:17px; font-weight:700; }
+  .inv-pie { position:sticky; bottom:0; background:var(--bg); padding:10px 0 4px; margin-top:8px; border-top:1px solid var(--line); }
+  .inv-pie .rinde { text-align:center; margin-bottom:8px; }
+  .inv-pie .btn-secondary { margin-bottom:8px; }
+  .inv-row.marcado { background:#fbefd9; border-left-color:var(--warn); }
+  .inv-row.marcado .stepper { opacity:.55; }
+  .inv-flag { background:none; border:none; color:var(--ink-soft); font-size:12.5px; padding:8px 0 2px; text-decoration:underline; cursor:pointer; min-height:36px; }
+  .inv-marca { font-size:12.5px; color:var(--warn); font-weight:700; margin-top:4px; }
+  .sug-btn { margin-top:12px; }
+  .rep-campo { width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:10px; padding:12px; font-size:15px; margin:4px 0 10px; background:var(--bg); color:var(--ink); font-family:inherit; }
+  .campo-lbl { font-size:12.5px; color:var(--ink-soft); font-weight:600; }
+  .btn-primary[disabled] { background:#dcd5c8; color:var(--ink-soft); }
 </style>
 </head>
 <body>
@@ -81,6 +117,10 @@
       <div style="flex:1;"><div class="modo-nombre">Hacer un pedido</div><div class="modo-desc">Pedir productos en Chef Pedido</div></div>
       <div style="color:var(--accent);font-size:20px;font-weight:700;">↗</div>
     </a>
+    <div class="modo-card modo-destacado" id="btnIrInventarios">
+      <div class="modo-emoji">📦</div>
+      <div><div class="modo-nombre">Inventarios del día</div><div class="modo-desc" id="invHomeResumen">Contar lo que hay en cocina, proveedor por proveedor</div></div>
+    </div>
     <div class="modo-card" data-modo="calculadora">
       <div class="modo-emoji">🧮</div>
       <div><div class="modo-nombre">Calculadora</div><div class="modo-desc">Elige un producto y cuánto quieres hacer</div></div>
@@ -276,8 +316,67 @@
     <div class="section-title">Historial reciente</div>
     <div class="card" id="prodHistorial"><p class="rinde">Sin registros aún.</p></div>
   </div>
+
+  <!-- Inventarios: ingreso con correo y clave -->
+  <div id="vistaInvLogin" class="hidden">
+    <button class="back" id="btnInvLoginVolver">← Inicio</button>
+    <h2 style="margin:2px 0 4px;">📦 Inventarios del día</h2>
+    <div class="rinde" style="margin-bottom:16px;">Ingresa con tu correo y tu clave personal, los mismos de la app donde ves tu contrato y tus liquidaciones. También sirve el correo compartido de Casa Turquesa.</div>
+    <div class="card">
+      <div class="fcampo"><label for="invLoginCorreo">Correo</label><input id="invLoginCorreo" type="email" autocomplete="username" inputmode="email"></div>
+      <div class="fcampo"><label for="invLoginClave">Clave</label><input id="invLoginClave" type="password" autocomplete="current-password"></div>
+      <label class="chk"><input type="checkbox" id="invLoginRecordar" checked> Recordar mi correo y mantener la sesión abierta en este celular</label>
+      <button class="btn-primary" id="btnInvLoginEntrar">Ingresar</button>
+      <div class="err" id="invLoginErr"></div>
+    </div>
+  </div>
+
+  <!-- Inventarios del día: lista de proveedores -->
+  <div id="vistaInv" class="hidden">
+    <button class="back" id="btnVolverInicioDesdeInv">← Inicio</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <h2 style="margin:0;">📦 Inventarios del día</h2>
+      <button class="btn-secondary" id="btnInvSalir" style="width:auto;padding:8px 12px;font-size:12.5px;">Salir</button>
+    </div>
+    <div class="rinde" id="invFecha"></div>
+    <div class="barra-prog"><div id="invBarra"></div></div>
+    <div class="rinde" id="invProgTxt" style="margin-bottom:4px;"></div>
+    <div id="invLista"><p class="rinde">Cargando...</p></div>
+    <button class="btn-secondary sug-btn" id="btnSugInvLista" type="button">➕ Falta un producto en el inventario</button>
+  </div>
+
+  <!-- Inventario de un proveedor: lista de productos -->
+  <div id="vistaInvDetalle" class="hidden">
+    <button class="back" id="btnVolverInv">← Proveedores</button>
+    <h2 style="margin:0;" id="invDetNombre"></h2>
+    <div class="rinde" id="invDetMeta" style="margin-bottom:10px;"></div>
+    <input type="text" id="invBuscar" class="hidden" placeholder="🔍 Buscar producto..." autocomplete="off">
+    <div class="card" id="invFilas" style="padding-top:4px;padding-bottom:4px;"></div>
+    <button class="btn-secondary sug-btn" id="btnSugInvDet" type="button">➕ Falta un producto de este proveedor</button>
+    <div class="inv-pie">
+      <div class="rinde" id="invFaltan"></div>
+      <button class="btn-secondary hidden" id="btnInvCeros"></button>
+      <button class="btn-primary" id="btnInvEnviar" disabled>Enviar inventario</button>
+    </div>
+  </div>
 </main>
 
+<!-- Reporte de inventario: "no es de mi estación" o "falta un producto" -->
+<div id="modalReporteInv" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="nombre" id="repTitulo" style="margin-bottom:4px;"></div>
+    <div class="rinde" id="repAyuda" style="margin-bottom:12px;"></div>
+    <div id="repCampoProdWrap"><div class="campo-lbl">Producto</div><input type="text" class="rep-campo" id="repProducto" maxlength="200" autocomplete="off" placeholder="Ej: Azúcar flor 1 kg"></div>
+    <div id="repCampoProvWrap"><div class="campo-lbl">Proveedor (si lo sabes)</div><input type="text" class="rep-campo" id="repProveedor" maxlength="200" autocomplete="off" placeholder="Ej: Distribuidora Primos"></div>
+    <div class="campo-lbl" id="repNotaLbl">Comentario (opcional)</div>
+    <textarea class="rep-campo" id="repNota" rows="3" maxlength="500" placeholder=""></textarea>
+    <button class="btn-primary" id="btnRepEnviar" type="button">Enviar</button>
+    <button class="btn-secondary" id="btnRepCancelar" type="button" style="margin-top:10px;">Cancelar</button>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const SUPABASE_URL = "https://udsvumfwczyormmprizm.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkc3Z1bWZ3Y3p5b3JtbXByaXptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MTg1MzgsImV4cCI6MjA5NTM5NDUzOH0.h3MzXhUrIkwssCCwWSohg9l40weroZUP81NJ3PLIAxE";
@@ -310,7 +409,7 @@ function detallePorcion(i, f) {
   const n = Number(i.cantidad) * (f || 1);
   return ' <span style="color:var(--ink-soft);font-weight:normal;">(1 porción = ' + g + " g" + (n !== 1 ? ", total " + fmtCantidad(n * g) + " g" : "") + ")</span>";
 }
-const VISTAS = ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito","vistaMenuCalendario","vistaMenuDiario","vistaEquipos","vistaEquipo"];
+const VISTAS = ["vistaHome","vistaAreas","vistaLista","vistaDetalle","vistaCalculadora","vistaProduccion","vistaCarrito","vistaMenuCalendario","vistaMenuDiario","vistaEquipos","vistaEquipo","vistaInvLogin","vistaInv","vistaInvDetalle"];
 function ocultarTodo() {
   VISTAS.forEach(id => document.getElementById(id).classList.add("hidden"));
   document.querySelector("main").classList.remove("ancho");
@@ -1061,6 +1160,312 @@ cargarEquipos().then(() => {
   if (e) abrirEquipo(e.id);
 });
 if (new URLSearchParams(location.search).get("menu")) abrirMenuDiario();
+
+// ================= Inventarios del día (estación Cocina) =================
+const INV_ESTACION = "cocina";
+const $i = id => document.getElementById(id);
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }) : null;
+const invStore = {
+  leer(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  poner(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+};
+let USUARIO = null;
+function esErrorSesion(error, status) { return status === 401 || status === 403 || /jwt|sin acceso|not authenticated/i.test((error && error.message) || ""); }
+function normTxt(s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+function fechaHoy() { return new Date().toLocaleDateString("en-CA"); }
+function fechaLarga() { const f = new Date().toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" }); return f.charAt(0).toUpperCase() + f.slice(1); }
+function horaAhora() { return new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }); }
+function invMostrar(id) { ocultarTodo(); $i(id).classList.remove("hidden"); window.scrollTo({ top: 0 }); }
+
+let toastTimer = null;
+function toast(titulo, detalle, mal) {
+  const el = $i("toast");
+  el.className = "toast on" + (mal ? " mal" : "");
+  el.innerHTML = `<b>${esc(titulo)}</b>` + (detalle ? `<span>${esc(detalle)}</span>` : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("on"), mal ? 5500 : 4000);
+}
+
+// ---- Sesión (correo y clave de Casa Turquesa) ----
+async function abrirInventarios() {
+  if (!sb) { invMostrarLogin("No se pudo cargar el inicio de sesión. Revisa tu internet y recarga la página."); return; }
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { invMostrarLogin(); return; }
+  const { data, error, status } = await sb.rpc("barra_salon_mi_usuario");
+  if (error) { invMostrarLogin(esErrorSesion(error, status) ? "Tu sesión venció. Ingresa de nuevo." : "No hay conexión. Revisa tu internet e intenta de nuevo."); return; }
+  if (!data) { await sb.auth.signOut(); invMostrarLogin("Este correo no tiene acceso a los inventarios. Si trabajas en Casa Turquesa, avísale a Eric."); return; }
+  USUARIO = data;
+  irAInventarios();
+}
+function invMostrarLogin(msg) {
+  USUARIO = null;
+  invMostrar("vistaInvLogin");
+  document.getElementById("headerEyebrow").textContent = "Casa Turquesa · Inventarios";
+  $i("invLoginErr").textContent = msg || "";
+  if (!$i("invLoginCorreo").value) $i("invLoginCorreo").value = invStore.leer("cocina_correo") || "";
+}
+$i("btnInvLoginEntrar").addEventListener("click", async () => {
+  if (!sb) { $i("invLoginErr").textContent = "Sin conexión. Revisa tu internet y recarga la página."; return; }
+  const correo = $i("invLoginCorreo").value.trim();
+  if (!correo || !$i("invLoginClave").value) { $i("invLoginErr").textContent = "Escribe el correo y la clave."; return; }
+  $i("invLoginErr").textContent = "";
+  const b = $i("btnInvLoginEntrar"); b.disabled = true; b.textContent = "Ingresando...";
+  const { error } = await sb.auth.signInWithPassword({ email: correo, password: $i("invLoginClave").value });
+  b.disabled = false; b.textContent = "Ingresar";
+  if (error) { $i("invLoginErr").textContent = /fetch|network/i.test(error.message || "") ? "Sin conexión. Revisa tu internet." : "Correo o clave incorrectos."; return; }
+  $i("invLoginClave").value = "";
+  invStore.poner("cocina_correo", $i("invLoginRecordar").checked ? correo : null);
+  abrirInventarios();
+});
+$i("invLoginClave").addEventListener("keydown", e => { if (e.key === "Enter") $i("btnInvLoginEntrar").click(); });
+$i("btnInvLoginVolver").addEventListener("click", irAHome);
+$i("btnVolverInicioDesdeInv").addEventListener("click", irAHome);
+$i("btnInvSalir").addEventListener("click", async () => { if (sb) await sb.auth.signOut(); USUARIO = null; irAHome(); });
+$i("btnIrInventarios").addEventListener("click", abrirInventarios);
+function manejarSesionVencida(e) {
+  if (e && e.sesion) { invMostrarLogin("Tu sesión venció. Ingresa de nuevo."); return true; }
+  return false;
+}
+function quienSoy() { return (USUARIO && (USUARIO.nombre_corto || USUARIO.nombre)) || "sin nombre"; }
+
+// ---- Inventarios del día ----
+let INV_LISTA = [];
+let INV_ACTUAL = null;
+let INV_REPORTES = [];
+function reporteMarca(prov, prod) { return INV_REPORTES.find(r => r.tipo === "no_corresponde" && r.proveedor === prov && r.producto === prod) || null; }
+function listoMio(s) { return s.estado === "respondido" || s.mi_parte_lista === true; }
+
+async function obtenerInventarioDia() {
+  if (!sb) { const e = new Error("sin conexión"); throw e; }
+  const { data, error, status } = await sb.rpc("inventario_turno_app", { p_estacion: INV_ESTACION });
+  if (error) { const e = new Error(error.message); e.sesion = esErrorSesion(error, status); throw e; }
+  INV_LISTA = Array.isArray(data) ? data : [];
+  try {
+    const r = await sb.rpc("inventario_reportes_app", { p_estacion: INV_ESTACION });
+    INV_REPORTES = Array.isArray(r.data) ? r.data : [];
+  } catch (e) { INV_REPORTES = []; }
+  return INV_LISTA;
+}
+function itemsDeRespuesta(resp) {
+  if (!resp) return [];
+  if (Array.isArray(resp)) return resp;
+  return Array.isArray(resp.items) ? resp.items : [];
+}
+function fmtCant(v) { return String(v == null ? "" : v).replace(".", ","); }
+
+function irAInventarios() {
+  invMostrar("vistaInv");
+  document.getElementById("headerEyebrow").textContent = "Casa Turquesa · Inventarios del día";
+  $i("invFecha").textContent = fechaLarga();
+  cargarInventarioDia();
+}
+async function cargarInventarioDia() {
+  $i("invLista").innerHTML = '<p class="rinde">Cargando...</p>';
+  try { await obtenerInventarioDia(); }
+  catch (e) {
+    if (manejarSesionVencida(e)) return;
+    $i("invLista").innerHTML = '<p class="rinde">No se pudo cargar. Revisa tu internet.</p><button class="btn-secondary" id="btnReintentarInv">Reintentar</button>';
+    $i("btnReintentarInv").addEventListener("click", cargarInventarioDia);
+    return;
+  }
+  renderInventarioLista();
+}
+function cardProveedor(s) {
+  const listo = listoMio(s);
+  const n = (s.productos || []).length;
+  const desde = s.desde && s.desde < fechaHoy() ? `<span class="chip aviso">desde ${new Date(s.desde + "T00:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}</span>` : "";
+  const turno = s.turno ? `<span class="chip">${esc(s.turno)}</span>` : "";
+  const hora = listo && s.respondido_at ? new Date(s.respondido_at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : "";
+  return `<div class="card card-tap inv-prov" data-id="${s.id}">
+    <div><div class="nombre">${listo ? "✅ " : ""}${esc(s.proveedor)}</div>
+      <div class="rinde">${n} producto${n === 1 ? "" : "s"}${turno}${desde}${listo && hora ? ` · enviado ${hora}` : ""}</div></div>
+    <div class="flecha">›</div>
+  </div>`;
+}
+function renderInventarioLista() {
+  const pend = INV_LISTA.filter(s => !listoMio(s));
+  const listos = INV_LISTA.filter(listoMio);
+  const total = INV_LISTA.length;
+  $i("invBarra").style.width = (total ? Math.round(listos.length / total * 100) : 0) + "%";
+  $i("invProgTxt").textContent = !total ? "" : (listos.length === total ? "Todo listo ✅" : `${listos.length} de ${total} proveedores contados`);
+  let html = "";
+  if (!total) html = '<p class="rinde">Hoy no hay inventarios de cocina por contar.</p>';
+  if (pend.length) html += `<div class="section-title">Por contar (${pend.length})</div>` + pend.map(cardProveedor).join("");
+  if (listos.length) html += `<div class="section-title">Listos (${listos.length})</div>` + listos.map(cardProveedor).join("");
+  $i("invLista").innerHTML = html;
+  $i("invLista").querySelectorAll(".inv-prov").forEach(el => el.addEventListener("click", () => abrirInventarioProveedor(el.dataset.id)));
+  const hechos = listos.length;
+  $i("invHomeResumen").textContent = !total ? "Hoy no hay inventarios de cocina por contar" : (hechos === total ? `Todo listo: ${hechos} proveedores` : `${hechos} de ${total} proveedores contados`);
+}
+
+function abrirInventarioProveedor(id) {
+  const s = INV_LISTA.find(x => x.id === id);
+  if (!s) return;
+  const previo = {};
+  itemsDeRespuesta(s.respuesta).forEach(i => { previo[i.producto] = String(i.cantidad == null ? "" : i.cantidad); });
+  let borrador = {};
+  try { borrador = JSON.parse(localStorage.getItem("inv_borrador_cocina_" + id) || "{}") || {}; } catch (e) {}
+  const productos = (s.productos || []).map(p => ({
+    producto: p.producto,
+    repId: (reporteMarca(s.proveedor, p.producto) || {}).id || null,
+    unidad: p.unidad && p.unidad !== "unidad" ? p.unidad : "",
+    valor: fmtCant(borrador[p.producto] != null ? borrador[p.producto] : (previo[p.producto] != null ? previo[p.producto] : ""))
+  }));
+  INV_ACTUAL = { id, proveedor: s.proveedor, productos, yaEnviado: listoMio(s) };
+  $i("invDetNombre").textContent = s.proveedor;
+  $i("invDetMeta").textContent = (s.turno ? "Turno " + s.turno + " · " : "") + productos.length + " producto" + (productos.length === 1 ? "" : "s") + (INV_ACTUAL.yaEnviado ? " · ya enviado, puedes corregirlo" : " · pon cuántos hay de cada uno");
+  $i("invBuscar").value = "";
+  $i("invBuscar").classList.toggle("hidden", productos.length < 10);
+  $i("btnInvEnviar").textContent = INV_ACTUAL.yaEnviado ? "Guardar corrección" : "Enviar inventario";
+  renderFilasInv();
+  invMostrar("vistaInvDetalle");
+}
+function renderFilasInv() {
+  $i("invFilas").innerHTML = INV_ACTUAL.productos.map((p, i) => `<div class="inv-row${p.valor !== "" ? " ok" : ""}${p.repId ? " marcado" : ""}" data-i="${i}" data-nom="${esc(normTxt(p.producto))}">
+    <div class="inv-nom">${esc(p.producto)}${p.unidad ? `<div class="rinde">${esc(p.unidad)}</div>` : ""}
+      ${p.repId ? `<div class="inv-marca">⚑ Enviado a revisión: no hace falta contarlo</div><button type="button" class="inv-flag" data-flag="quitar">Deshacer</button>` : `<button type="button" class="inv-flag" data-flag="marcar">⚑ No es de mi estación</button>`}</div>
+    <div class="stepper"><button type="button" data-a="menos" aria-label="Restar uno">−</button><input type="text" inputmode="decimal" autocomplete="off" placeholder="—" value="${esc(p.valor)}"><button type="button" data-a="mas" aria-label="Sumar uno">+</button></div>
+  </div>`).join("");
+  actualizarPieInv();
+  const q = $i("invBuscar").value; if (q) $i("invBuscar").dispatchEvent(new Event("input"));
+}
+function valorNum(v) { const n = parseFloat(String(v).replace(",", ".")); return isNaN(n) ? null : n; }
+function guardarBorradorInv() {
+  try {
+    const o = {};
+    INV_ACTUAL.productos.forEach(p => { if (p.valor !== "") o[p.producto] = p.valor; });
+    localStorage.setItem("inv_borrador_cocina_" + INV_ACTUAL.id, JSON.stringify(o));
+  } catch (e) {}
+}
+function actualizarPieInv() {
+  const faltan = INV_ACTUAL.productos.filter(p => p.valor === "" && !p.repId).length;
+  $i("invFaltan").textContent = faltan ? `Faltan ${faltan} de ${INV_ACTUAL.productos.length}` : `Todo contado (${INV_ACTUAL.productos.length})`;
+  $i("btnInvEnviar").disabled = faltan > 0;
+  $i("btnInvCeros").classList.toggle("hidden", faltan === 0 || faltan === INV_ACTUAL.productos.filter(p => !p.repId).length);
+  $i("btnInvCeros").textContent = `Poner 0 en los ${faltan} que faltan`;
+}
+function setValorInv(i, valor, fila) {
+  INV_ACTUAL.productos[i].valor = valor;
+  fila.classList.toggle("ok", valor !== "");
+  guardarBorradorInv();
+  actualizarPieInv();
+}
+$i("invFilas").addEventListener("click", e => {
+  const b = e.target.closest("button[data-a]");
+  if (!b) return;
+  const fila = b.closest(".inv-row");
+  const i = Number(fila.dataset.i);
+  const n = valorNum(INV_ACTUAL.productos[i].valor);
+  const nuevo = b.dataset.a === "mas" ? (n == null ? 1 : n + 1) : (n == null ? 0 : Math.max(0, n - 1));
+  const txt = fmtCant(Math.round(nuevo * 100) / 100);
+  fila.querySelector("input").value = txt;
+  setValorInv(i, txt, fila);
+});
+$i("invFilas").addEventListener("input", e => {
+  const inp = e.target;
+  if (!inp.matches("input")) return;
+  const m = inp.value.replace(/[^0-9.,]/g, "").match(/^(\d*)([.,]?)(\d*)/);
+  const v = m ? m[1] + m[2] + m[3] : "";
+  if (v !== inp.value) inp.value = v;
+  const fila = inp.closest(".inv-row");
+  setValorInv(Number(fila.dataset.i), v.replace(/[.,]$/, ""), fila);
+});
+$i("invFilas").addEventListener("focusin", e => { if (e.target.matches("input")) e.target.select(); });
+$i("invBuscar").addEventListener("input", () => {
+  const q = normTxt($i("invBuscar").value.trim());
+  $i("invFilas").querySelectorAll(".inv-row").forEach(f => f.classList.toggle("hidden", !!q && !f.dataset.nom.includes(q)));
+});
+$i("btnInvCeros").addEventListener("click", () => {
+  $i("invFilas").querySelectorAll(".inv-row").forEach(f => {
+    const i = Number(f.dataset.i);
+    if (INV_ACTUAL.productos[i].valor === "" && !INV_ACTUAL.productos[i].repId) { f.querySelector("input").value = "0"; setValorInv(i, "0", f); }
+  });
+});
+$i("btnVolverInv").addEventListener("click", () => { invMostrar("vistaInv"); renderInventarioLista(); });
+$i("btnInvEnviar").addEventListener("click", () => enviarInventario(quienSoy()));
+
+// ---- Reportes de inventario: "no es de mi estación" y "falta un producto" ----
+let REP_ACTUAL = null;
+function abrirReporte(cfg) {
+  REP_ACTUAL = cfg;
+  $i("repTitulo").textContent = cfg.titulo;
+  $i("repAyuda").textContent = cfg.ayuda;
+  $i("repCampoProdWrap").classList.toggle("hidden", !cfg.pideProducto);
+  $i("repCampoProvWrap").classList.toggle("hidden", !cfg.pideProveedor);
+  $i("repProducto").value = cfg.producto || "";
+  $i("repProveedor").value = cfg.proveedor || "";
+  $i("repNota").value = "";
+  $i("repNota").placeholder = cfg.notaEjemplo || "";
+  $i("btnRepEnviar").textContent = cfg.boton;
+  $i("btnRepEnviar").disabled = false;
+  $i("modalReporteInv").classList.remove("hidden");
+}
+function cerrarReporte() { $i("modalReporteInv").classList.add("hidden"); REP_ACTUAL = null; }
+$i("btnRepCancelar").addEventListener("click", cerrarReporte);
+$i("btnRepEnviar").addEventListener("click", async () => {
+  const c = REP_ACTUAL; if (!c) return;
+  const producto = ($i("repProducto").value || c.producto || "").trim();
+  if (!producto) { toast("Falta el producto", "Escribe cuál es el producto.", true); return; }
+  const btn = $i("btnRepEnviar"); btn.disabled = true; btn.textContent = "Enviando...";
+  const proveedor = c.pideProveedor ? ($i("repProveedor").value || "").trim() : (c.proveedor || "");
+  const { data, error, status } = await sb.rpc("inventario_reportar_app", { p_tipo: c.tipo, p_proveedor: proveedor || null, p_producto: producto, p_nota: ($i("repNota").value || "").trim() || null, p_por: quienSoy(), p_solicitud: c.solicitud || null, p_estacion: INV_ESTACION });
+  btn.disabled = false; btn.textContent = c.boton;
+  if (error) {
+    if (esErrorSesion(error, status)) { cerrarReporte(); invMostrarLogin("Tu sesión venció. Ingresa de nuevo."); return; }
+    toast("No se pudo enviar", "Revisa tu internet e intenta de nuevo.", true); return;
+  }
+  cerrarReporte();
+  if (c.tipo === "no_corresponde") {
+    INV_REPORTES.push({ id: data && data.id, tipo: "no_corresponde", proveedor: c.proveedor, producto });
+    if (INV_ACTUAL) { const p = INV_ACTUAL.productos.find(x => x.producto === producto); if (p) { p.repId = data && data.id; renderFilasInv(); } }
+    toast("⚑ Enviado a revisión", producto + " · ya no hace falta contarlo");
+  } else {
+    toast("✅ Sugerencia enviada", producto + " · lo vamos a revisar");
+  }
+});
+$i("invFilas").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-flag]");
+  if (!b || !INV_ACTUAL) return;
+  const i = Number(b.closest(".inv-row").dataset.i);
+  const p = INV_ACTUAL.productos[i];
+  if (b.dataset.flag === "marcar") {
+    abrirReporte({ tipo: "no_corresponde", titulo: "⚑ No es de mi estación", ayuda: p.producto + " · lo revisamos y te avisamos si corresponde o no. Mientras tanto no hace falta contarlo.", proveedor: INV_ACTUAL.proveedor, producto: p.producto, solicitud: INV_ACTUAL.id, pideProducto: false, pideProveedor: false, boton: "Enviar a revisión", notaEjemplo: "Ej: esto es de barra y salón / no lo usamos en cocina" });
+  } else {
+    b.disabled = true;
+    const { error, status } = await sb.rpc("inventario_reporte_quitar_app", { p_id: p.repId });
+    if (error) { b.disabled = false; if (esErrorSesion(error, status)) { invMostrarLogin("Tu sesión venció. Ingresa de nuevo."); return; } toast("No se pudo deshacer", "Intenta de nuevo.", true); return; }
+    INV_REPORTES = INV_REPORTES.filter(r => r.id !== p.repId);
+    p.repId = null; renderFilasInv();
+  }
+});
+function abrirSugerencia(proveedor, solicitud) {
+  abrirReporte({ tipo: "sugerencia", titulo: "➕ Falta un producto en el inventario", ayuda: "Cuéntanos qué producto debería estar para que lo revisemos y lo sumemos.", proveedor: proveedor || "", solicitud: solicitud || null, pideProducto: true, pideProveedor: !proveedor, boton: "Enviar sugerencia", notaEjemplo: "Ej: lo usamos todos los días y siempre se acaba" });
+}
+$i("btnSugInvLista").addEventListener("click", () => abrirSugerencia("", null));
+$i("btnSugInvDet").addEventListener("click", () => abrirSugerencia(INV_ACTUAL ? INV_ACTUAL.proveedor : "", INV_ACTUAL ? INV_ACTUAL.id : null));
+
+async function enviarInventario(quien) {
+  const s = INV_ACTUAL;
+  const btn = $i("btnInvEnviar");
+  btn.disabled = true; btn.textContent = "Enviando...";
+  const items = s.productos.filter(p => p.valor !== "").map(p => ({ producto: p.producto, cantidad: p.valor.replace(",", ".") }));
+  const { error, status } = await sb.rpc("inventario_responder_app", { p_id: s.id, p_items: items, p_por: quien, p_estacion: INV_ESTACION });
+  btn.textContent = s.yaEnviado ? "Guardar corrección" : "Enviar inventario";
+  if (error) {
+    actualizarPieInv();
+    if (esErrorSesion(error, status)) { invMostrarLogin("Tu sesión venció. Ingresa de nuevo (lo que contaste quedó guardado)."); return; }
+    toast("No se guardó el inventario", "Revisa tu internet e intenta de nuevo. Lo que contaste sigue acá.", true);
+    return;
+  }
+  try { localStorage.removeItem("inv_borrador_cocina_" + s.id); } catch (e) {}
+  try { await obtenerInventarioDia(); } catch (e) {
+    const x = INV_LISTA.find(z => z.id === s.id); if (x) { x.mi_parte_lista = true; x.respondido_at = new Date().toISOString(); }
+  }
+  invMostrar("vistaInv");
+  renderInventarioLista();
+  const hechos = INV_LISTA.filter(listoMio).length;
+  toast("✅ Inventario registrado", `${s.proveedor} · ${quien} · ${horaAhora()} · ${hechos} de ${INV_LISTA.length} proveedores`);
+}
 </script>
 </body>
 </html>
